@@ -68,7 +68,8 @@ regulatory language to actual business operations.
 - Web frontend: Next.js + React + TypeScript + Tailwind (later phase)
 - Main API: Node.js + Express — users, login, tasks, alerts, dashboards
 - Engine: Python 3.11+ / FastAPI — OCR, AI extraction, verification, knowledge base, search, review queue
-- Database: ONE PostgreSQL 16 + pgvector. Clear ownership: Python owns the regulation tables, Node owns the app tables (users, tasks, alerts). Nobody writes into the other's tables.
+- Database: ONE PostgreSQL 18 + pgvector (originally planned as 16; updated 2026-09-11 to match the version already installed on the dev machine — no functional impact). Clear ownership: Python owns the regulation tables, Node owns the app tables (users, tasks, alerts). Nobody writes into the other's tables.
+  - pgvector is deferred: no Windows prebuilt package exists, it needs Visual Studio Build Tools to compile. Not needed until Phase 2 (semantic search), so it will be installed and enabled then, not during initial setup.
 - Repository: monorepo — apps/engine (Python), apps/api (Node), apps/web (Next)
 - Python tooling: uv, SQLAlchemy 2.0 (Mapped style), Alembic migrations, Pydantic v2, pytest
 - The engine is ONE service, not microservices. No Redis/Kafka/Celery until real scale requires it.
