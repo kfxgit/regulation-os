@@ -53,11 +53,11 @@ def make_document_version(session, regulator=None):
     return document_version
 
 
-def make_document_page(session, document_version, page_number=1):
+def make_document_page(session, document_version, page_number=1, raw_text=None):
     page = DocumentPage(
         document_version_id=document_version.id,
         page_number=page_number,
-        raw_text="Banks must maintain a minimum capital adequacy ratio of 10%.",
+        raw_text=raw_text or "Banks must maintain a minimum capital adequacy ratio of 10%.",
     )
     session.add(page)
     session.flush()
