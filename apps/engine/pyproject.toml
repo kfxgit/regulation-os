@@ -1,0 +1,30 @@
+[project]
+name = "regos-engine"
+version = "0.1.0"
+description = "Regulation OS engine: OCR, AI extraction, verification, knowledge base"
+readme = "README.md"
+authors = [
+    { name = "kfxgit", email = "kaneezenoori@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "alembic>=1.19.2",
+    "fastapi>=0.141.1",
+    "psycopg[binary]>=3.3.5",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "sqlalchemy[asyncio]>=2.0.52",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
