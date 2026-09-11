@@ -59,7 +59,8 @@ regulatory language to actual business operations.
 ## 5. Scope strategy
 
 - Start: State Bank of Pakistan (SBP) documents — first regulatory PACK, not the product boundary.
-- The pipeline: PDF → OCR (pdf2image + Claude vision) → AI extraction (Anthropic Claude, structured output via tool calling / forced JSON, temperature 0) → Pydantic validation → source verification (fuzzy match) → human review → PostgreSQL knowledge base.
+- The pipeline: PDF → OCR (pdf2image + Claude vision) → AI extraction (Anthropic Claude, structured output via tool calling / forced JSON) → Pydantic validation → source verification (fuzzy match) → human review → PostgreSQL knowledge base.
+  - Updated 2026-09-11: "temperature 0" dropped from this line -- the Anthropic API no longer exposes a temperature parameter (confirmed by inspecting SDK 1.5.0's actual call signature, not assumed). Determinism is enforced through strict prompt instructions instead.
   - Updated 2026-09-11: AI extraction originally planned as Gemini; switched to Anthropic Claude per explicit decision.
   - Updated 2026-09-11: OCR originally planned as Tesseract; switched to Claude vision per explicit decision (better accuracy on real SBP scans: tables, stamps, multi-column layouts). This makes the OCR step AI-based too, which blurs "AI is not the source of truth" (section 4) more than classical OCR did. Mitigation: OCR stays a strictly separate call from interpretation — narrow, temperature 0, "transcribe exactly what is on this page, do not summarize or interpret" — its output (DocumentPage.raw_text) is still treated as the mechanical source-text layer that requirements must cite against, not as an AI opinion. Revisit if OCR transcription errors show up in the gold-standard dataset review.
 - Next regulators (SECP etc.) become new packs on the same core engine.
