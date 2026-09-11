@@ -12,7 +12,7 @@ import uuid
 from datetime import date
 from typing import Optional
 
-from sqlalchemy import Date, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -45,6 +45,12 @@ class RegulatoryRequirement(UUIDPKMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("regulatory_requirement.id"), default=None
     )
     effective_date: Mapped[Optional[date]] = mapped_column(Date, default=None)
+
+    # HIGH-RISK FIELDS GET EXTRA VERIFICATION (CLAUDE.md section 4).
+    # Claude must always explicitly decide this (no default in the
+    # extraction contract) -- so it's NOT NULL here too, no default.
+    contains_high_risk_language: Mapped[bool] = mapped_column(Boolean)
+    high_risk_notes: Mapped[Optional[str]] = mapped_column(Text, default=None)
 
     # Five separate confidence scores. Never a single generic score.
     # No silent defaults: missing stays NULL, never 0.

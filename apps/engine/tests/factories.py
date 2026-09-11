@@ -86,6 +86,7 @@ def make_requirement(session, document_version, extraction_run, **overrides):
         clause_type=ClauseType.RULE,
         requirement_text="Banks must maintain a minimum capital adequacy ratio of 10%.",
         status=RequirementStatus.DRAFT,
+        contains_high_risk_language=True,
         extraction_run_id=extraction_run.id,
     )
     defaults.update(overrides)

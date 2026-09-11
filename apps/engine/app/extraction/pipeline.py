@@ -61,6 +61,8 @@ def ingest_page_text(
             requirement_text=extracted_req.requirement_text,
             status=RequirementStatus.DRAFT,
             effective_date=extracted_req.effective_date,
+            contains_high_risk_language=extracted_req.contains_high_risk_language,
+            high_risk_notes=extracted_req.high_risk_notes,
             confidence_extraction=extracted_req.confidence_extraction,
             confidence_source_match=req_match.match_score,
             confidence_classification=extracted_req.confidence_classification,
