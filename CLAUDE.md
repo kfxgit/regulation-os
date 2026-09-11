@@ -59,8 +59,9 @@ regulatory language to actual business operations.
 ## 5. Scope strategy
 
 - Start: State Bank of Pakistan (SBP) documents — first regulatory PACK, not the product boundary.
-- The pipeline: PDF → OCR (pdf2image + Tesseract) → AI extraction (Anthropic Claude, structured output via tool calling / forced JSON, temperature 0) → Pydantic validation → source verification (fuzzy match) → human review → PostgreSQL knowledge base.
-  - Updated 2026-09-11: originally planned as Gemini; switched to Anthropic Claude per explicit decision. No other part of the pipeline changes — Claude fills the same "AI extraction" slot, still never the source of truth (see section 4).
+- The pipeline: PDF → OCR (pdf2image + Claude vision) → AI extraction (Anthropic Claude, structured output via tool calling / forced JSON, temperature 0) → Pydantic validation → source verification (fuzzy match) → human review → PostgreSQL knowledge base.
+  - Updated 2026-09-11: AI extraction originally planned as Gemini; switched to Anthropic Claude per explicit decision.
+  - Updated 2026-09-11: OCR originally planned as Tesseract; switched to Claude vision per explicit decision (better accuracy on real SBP scans: tables, stamps, multi-column layouts). This makes the OCR step AI-based too, which blurs "AI is not the source of truth" (section 4) more than classical OCR did. Mitigation: OCR stays a strictly separate call from interpretation — narrow, temperature 0, "transcribe exactly what is on this page, do not summarize or interpret" — its output (DocumentPage.raw_text) is still treated as the mechanical source-text layer that requirements must cite against, not as an AI opinion. Revisit if OCR transcription errors show up in the gold-standard dataset review.
 - Next regulators (SECP etc.) become new packs on the same core engine.
 - Target users (later phases): banks, FinTechs (EMIs, PSPs, wallets, BNPL, digital lenders), insurance, corporates, professional services, regulators.
 
@@ -94,7 +95,7 @@ ObligationAssignment.
 ## 8. Roadmap
 
 - Phase 0 (CURRENT): v2 data model — 16 regulation tables, migration, seed data, 7 database tests that prove the integrity rules
-- Phase 1: extraction engine — Pydantic extraction contract, Claude prompt, OCR pipeline, source verification, gold-standard dataset (100+ hand-checked clauses from a 20–30 document SBP corpus)
+- Phase 1: extraction engine — Pydantic extraction contract, Claude prompt, OCR pipeline (pdf2image + Claude vision), source verification, gold-standard dataset (100+ hand-checked clauses from a 20–30 document SBP corpus)
 - Phase 2: regulatory intelligence — applicability engine, relationships, versioning, search (full-text + semantic), change detection, document browser
 - Phase 3: compliance engine — obligations workflow, controls, evidence, tasks, assessments, dashboards (Node side wakes up here)
 - Phase 4: FinTech compliance packs (EMI/PSP/wallet/BNPL workflows)
