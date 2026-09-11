@@ -19,5 +19,11 @@ Phase 0 complete: 16-table regulation data model, 2 Alembic migrations
 (schema + integrity triggers), SBP-pack seed data, 7/7 integrity tests
 passing.
 
-Next: Phase 1 -- extraction engine (Pydantic extraction contract, AI
-prompt, OCR pipeline, source verification, gold-standard dataset).
+Phase 1 core engine complete: Pydantic extraction contract, OCR
+(Claude vision), structured extraction (Claude Opus 5), fuzzy-match
+source verification, and a full ingestion pipeline (PDF -> DRAFT
+requirements/obligations/citations in Postgres). Verified live against
+realistic clause text and a real PDF end-to-end.
+
+Next: run the pipeline against a real SBP document, build the 100-clause
+gold-standard dataset, and human review of the DRAFT output.
