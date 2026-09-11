@@ -12,3 +12,6 @@ dist/
 # General
 *.log
 .DS_Store
+
+# Claude Code local session state (not project content)
+.claude/
