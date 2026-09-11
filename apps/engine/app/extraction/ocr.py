@@ -44,7 +44,12 @@ def transcribe_page(image: Image, model: str = DEFAULT_MODEL) -> str:
 
     response = client.messages.create(
         model=model,
-        max_tokens=4096,
+        max_tokens=8192,
+        # Transcription is mechanical, not reasoning-heavy -- low effort is
+        # enough and keeps cost down. (Opus 5 runs thinking by default, so
+        # content[0] is often a ThinkingBlock, not text -- find the text
+        # block explicitly rather than assume its position.)
+        output_config={"effort": "low"},
         messages=[
             {
                 "role": "user",
@@ -62,4 +67,7 @@ def transcribe_page(image: Image, model: str = DEFAULT_MODEL) -> str:
             }
         ],
     )
-    return response.content[0].text
+    try:
+        return next(block.text for block in response.content if block.type == "text")
+    except StopIteration:
+        raise RuntimeError(f"No text block in OCR response (stop_reason={response.stop_reason!r})")
