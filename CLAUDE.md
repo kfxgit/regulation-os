@@ -1,0 +1,115 @@
+# REGULATION OS — Project Briefing
+
+## 1. What we are building
+
+Regulation OS is an AI-powered Regulatory Intelligence & Compliance Platform.
+
+It converts regulatory documents — circulars, notifications, laws, rules,
+guidelines, amendments — into structured, verified, queryable requirements,
+and then into real-world compliance tracking: obligations, tasks, deadlines,
+impact analysis.
+
+One sentence: we turn changing regulations into executable business compliance.
+
+## 2. The problem
+
+Compliance teams at banks, FinTechs, and companies receive regulatory PDFs
+continuously. Today a human must: read every circular, understand it, decide
+who/what it applies to, compare with old versions, find what changed, convert
+it into tasks, update policies, collect evidence, track deadlines, and prepare
+audit reports. This is slow, expensive, error-prone, and easy to get wrong —
+and mistakes mean regulatory penalties.
+
+## 3. The core idea (the product backbone)
+
+```
+REGULATION
+   ↓
+REQUIREMENT        (what the regulation says, structured + verified)
+   ↓
+APPLICABILITY      (who/what it applies to: entity, product, activity, dates)
+   ↓
+OBLIGATION         (what an organization must actually DO)
+   ↓
+CONTROL            (later phase: the internal control that satisfies it)
+   ↓
+EVIDENCE           (later phase: the proof it was done)
+   ↓
+COMPLIANCE         (compliant / partially / non-compliant status)
+   ↓
+IMPACT ANALYSIS    (a change arrives → what is affected, downstream)
+```
+
+The key differentiator is this CHAIN. We are not building a PDF search engine
+or a document reader. Competitors stop at "search regulations". We connect
+regulatory language to actual business operations.
+
+## 4. Non-negotiable principles (memorize these)
+
+- DOCUMENT ≠ RULE. A document contains definitions, rules, exceptions, tables, procedures, amendments. Never treat a paragraph as "one rule".
+- REQUIREMENT ≠ OBLIGATION. Requirement = what the regulation says. Obligation = actor + action + object + frequency + deadline. Both stored separately, linked.
+- AI IS NOT THE SOURCE OF TRUTH. Hierarchy: official regulation → verified source text → structured data → AI interpretation. Every requirement must trace to exact source text (page + character span). No citation = unpublishable.
+- NO SILENT PUBLISHING. AI output is always a DRAFT candidate. A human reviews and approves/corrects before anything becomes ACTIVE.
+- NO SILENT DEFAULTS. Missing critical values stay empty and flagged. Never fill with 0 or false — a wrong limit is worse than a missing one.
+- NOTHING IS DELETED. When a circular amends a rule: new revision added, old revision marked SUPERSEDED, full history preserved, change recorded.
+- REQUIREMENTS ARE IMMUTABLE. Amendments append revisions; never edit rows.
+- HIGH-RISK FIELDS GET EXTRA VERIFICATION. Money, percentages, dates, deadlines, thresholds, prohibition language. "must not exceed 10%" must NEVER become "must exceed 10%".
+- FIVE SEPARATE CONFIDENCE SCORES, never one generic score: extraction, source_match, classification, applicability, interpretation.
+
+## 5. Scope strategy
+
+- Start: State Bank of Pakistan (SBP) documents — first regulatory PACK, not the product boundary.
+- The pipeline: PDF → OCR (pdf2image + Tesseract) → AI extraction (Gemini, structured output, temperature 0) → Pydantic validation → source verification (fuzzy match) → human review → PostgreSQL knowledge base.
+- Next regulators (SECP etc.) become new packs on the same core engine.
+- Target users (later phases): banks, FinTechs (EMIs, PSPs, wallets, BNPL, digital lenders), insurance, corporates, professional services, regulators.
+
+## 6. Tech stack (decided, do not change)
+
+- Web frontend: Next.js + React + TypeScript + Tailwind (later phase)
+- Main API: Node.js + Express — users, login, tasks, alerts, dashboards
+- Engine: Python 3.11+ / FastAPI — OCR, AI extraction, verification, knowledge base, search, review queue
+- Database: ONE PostgreSQL 16 + pgvector. Clear ownership: Python owns the regulation tables, Node owns the app tables (users, tasks, alerts). Nobody writes into the other's tables.
+- Repository: monorepo — apps/engine (Python), apps/api (Node), apps/web (Next)
+- Python tooling: uv, SQLAlchemy 2.0 (Mapped style), Alembic migrations, Pydantic v2, pytest
+- The engine is ONE service, not microservices. No Redis/Kafka/Celery until real scale requires it.
+
+## 7. Data model direction (Phase 0)
+
+Core regulation tables: Regulator, Document, DocumentVersion, DocumentPage,
+Section, RegulatoryRequirement (immutable, stable_key + revision),
+SourceCitation (page + char span proof), Obligation (canonical, tenant-free),
+RegulatoryRelationship (AMENDS / REPLACES / PARTIALLY_REPLACES / etc.),
+EntityType / ProductType / BusinessActivity (hierarchical lists),
+ApplicabilityRule (INCLUDES/EXCLUDES scoping), RegulatoryChange (added/
+modified/repealed/moved — backbone of impact analysis), ExtractionRun
+(every AI job logged: model, version, prompt version — run-to-run
+comparability), Review (human decisions with before/after snapshots).
+
+App tables (Node-owned, later phase): Organization, User, Task, Alert.
+Compliance tables (Phase 3+): Control, Evidence, ComplianceAssessment,
+ObligationAssignment.
+
+## 8. Roadmap
+
+- Phase 0 (CURRENT): v2 data model — 16 regulation tables, migration, seed data, 7 database tests that prove the integrity rules
+- Phase 1: extraction engine — Pydantic extraction contract, Gemini prompt, OCR pipeline, source verification, gold-standard dataset (100+ hand-checked clauses from a 20–30 document SBP corpus)
+- Phase 2: regulatory intelligence — applicability engine, relationships, versioning, search (full-text + semantic), change detection, document browser
+- Phase 3: compliance engine — obligations workflow, controls, evidence, tasks, assessments, dashboards (Node side wakes up here)
+- Phase 4: FinTech compliance packs (EMI/PSP/wallet/BNPL workflows)
+- Phase 5: multi-regulator (SECP + others)
+- Phase 6: public APIs, SupTech for regulators, multi-country
+
+## 9. Quality gates
+
+- The data model is not "done" until 100 hand-reviewed real clauses fit in it.
+- Every schema change = Alembic migration, never manual edits.
+- The 7 model tests must stay green at all times.
+- Before scaling to hundreds of documents: the 20–30 doc benchmark corpus must pass end-to-end, including the hard cases (master circulars, partial amendments, tables, definitions, applicability-heavy documents).
+
+## 10. How I want you to work
+
+- Simple English in all communication, comments, and docs.
+- Work in SMALL STAGES. After each stage, print a one-line confirmation and continue only if the check passed.
+- If a command fails: stop, show the full error, explain the cause, propose a fix, wait for my approval. Never silently skip or work around a failure.
+- Do not add features, files, or dependencies beyond what I ask for.
+- Windows / PowerShell environment.
