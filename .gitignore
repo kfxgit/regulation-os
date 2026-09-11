@@ -15,3 +15,8 @@ dist/
 
 # Claude Code local session state (not project content)
 .claude/
+
+# Source regulatory PDFs -- data, not code. Not committed (binary,
+# potentially many, and licensing of official documents varies).
+apps/engine/data/incoming/*
+!apps/engine/data/incoming/.gitkeep
