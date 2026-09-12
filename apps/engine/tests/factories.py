@@ -10,6 +10,7 @@ from app.models import (
     DocumentPage,
     DocumentVersion,
     ExtractionRun,
+    Obligation,
     Regulator,
     RegulatoryRequirement,
     SourceCitation,
@@ -94,6 +95,24 @@ def make_requirement(session, document_version, extraction_run, **overrides):
     session.add(requirement)
     session.flush()
     return requirement
+
+
+def make_obligation(session, requirement, extraction_run, **overrides):
+    defaults = dict(
+        stable_key=uuid.uuid4(),
+        revision_number=1,
+        requirement_id=requirement.id,
+        actor="Banks",
+        action="maintain",
+        object="minimum capital adequacy ratio",
+        status=RequirementStatus.DRAFT,
+        extraction_run_id=extraction_run.id,
+    )
+    defaults.update(overrides)
+    obligation = Obligation(**defaults)
+    session.add(obligation)
+    session.flush()
+    return obligation
 
 
 def make_citation(session, requirement, document_page):
