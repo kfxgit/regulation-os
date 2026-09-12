@@ -8,12 +8,10 @@ still counts as the "mechanical" source-text layer even though it's
 AI-based.
 """
 
-import base64
-from io import BytesIO
-
 from PIL.Image import Image
 
 from app.core.ai_client import DEFAULT_MODEL, get_anthropic_client
+from app.extraction.images import image_to_base64_png
 
 TRANSCRIBE_PROMPT = """Transcribe exactly what is written on this page image. This is a page from an official regulatory document.
 
@@ -25,12 +23,6 @@ Rules:
 - Output only the transcribed text. No preamble, no commentary, no markdown formatting."""
 
 
-def _image_to_base64_png(image: Image) -> str:
-    buffer = BytesIO()
-    image.save(buffer, format="PNG")
-    return base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
-
-
 def transcribe_page(image: Image, model: str = DEFAULT_MODEL) -> str:
     """Transcribe one page image to text.
 
@@ -40,7 +32,7 @@ def transcribe_page(image: Image, model: str = DEFAULT_MODEL) -> str:
     prompt (strict "transcribe only" instructions) instead.
     """
     client = get_anthropic_client()
-    image_b64 = _image_to_base64_png(image)
+    image_b64 = image_to_base64_png(image)
 
     response = client.messages.create(
         model=model,

@@ -24,7 +24,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import ClauseType, ObligationFrequency
+from app.models.enums import ClauseType, DocumentType, ObligationFrequency
 
 
 class ExtractedObligation(BaseModel):
@@ -92,3 +92,28 @@ class PageExtractionResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     requirements: list[ExtractedRequirement] = Field(default_factory=list)
+
+
+class ExtractedDocumentMetadata(BaseModel):
+    """For batch ingestion: read off a document's own first page instead
+    of requiring it typed in by hand for every file.
+
+    reference_number and issue_date are Optional -- if a document
+    genuinely doesn't state one clearly, that's a fact, not something to
+    guess (see "no silent defaults"). The caller must treat a null here
+    as "needs manual input", never invent a value to fill the DB's
+    NOT NULL columns.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, description="The document's title or subject line.")
+    reference_number: Optional[str] = Field(
+        default=None,
+        description="The official reference/circular number, e.g. 'BPRD Circular No. 01 of 2019'. Null if not clearly stated.",
+    )
+    issue_date: Optional[date] = Field(
+        default=None, description="The date the document was issued, as stated on the document. Null if not clearly stated."
+    )
+    document_type: DocumentType
+    confidence_extraction: float = Field(ge=0, le=1)
