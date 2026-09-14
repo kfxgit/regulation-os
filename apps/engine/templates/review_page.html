@@ -1,0 +1,524 @@
+<title>SBP Batch Review</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #F6F4EE;
+    --surface: #FFFFFF;
+    --surface-2: #FBFAF6;
+    --ink: #1B2420;
+    --muted: #6B7570;
+    --border: #DCD8CC;
+    --accent: #1F5C4E;
+    --accent-ink: #F6F4EE;
+    --high-risk: #A6740A;
+    --high-risk-bg: color-mix(in srgb, var(--high-risk) 14%, var(--surface));
+    --focus: #1F5C4E;
+
+    --type-rule: #1F5C4E;
+    --type-amendment: #3B5488;
+    --type-definition: #8A7B6B;
+    --type-exception: #9C4A3E;
+    --type-procedure: #6B4E85;
+    --type-table: #5B6B75;
+
+    --font-display: "IBM Plex Serif", Georgia, serif;
+    --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10161A;
+      --surface: #182024;
+      --surface-2: #141B1F;
+      --ink: #E7EEE9;
+      --muted: #8FA095;
+      --border: #2A353A;
+      --accent: #4FBFA0;
+      --accent-ink: #0B1412;
+      --high-risk: #D9A441;
+      --focus: #4FBFA0;
+
+      --type-rule: #4FBFA0;
+      --type-amendment: #7C93C7;
+      --type-definition: #B3A491;
+      --type-exception: #D08277;
+      --type-procedure: #A98BC4;
+      --type-table: #93A6B0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10161A;
+    --surface: #182024;
+    --surface-2: #141B1F;
+    --ink: #E7EEE9;
+    --muted: #8FA095;
+    --border: #2A353A;
+    --accent: #4FBFA0;
+    --accent-ink: #0B1412;
+    --high-risk: #D9A441;
+    --focus: #4FBFA0;
+
+    --type-rule: #4FBFA0;
+    --type-amendment: #7C93C7;
+    --type-definition: #B3A491;
+    --type-exception: #D08277;
+    --type-procedure: #A98BC4;
+    --type-table: #93A6B0;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 28px 80px;
+  }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  header.page-head { margin-bottom: 22px; }
+  header.page-head h1 { font-size: 28px; margin-top: 4px; }
+  header.page-head p.lede { color: var(--muted); max-width: 62ch; margin: 8px 0 0; }
+
+  /* stat tiles */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin: 20px 0;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .stat .n {
+    font-family: var(--font-mono);
+    font-size: 24px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+  .stat .l { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .stat.risk .n { color: var(--high-risk); }
+
+  /* filter bar */
+  .filterbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--bg);
+    padding-block: 10px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .filterbar input[type="search"] {
+    flex: 1 1 200px;
+    min-width: 0;
+    padding: 8px 12px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 14px;
+  }
+  .filterbar input[type="search"]:focus,
+  button:focus-visible,
+  input:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .chip {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .chip[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+  }
+  .chip.risk[aria-pressed="true"] { background: var(--high-risk); border-color: var(--high-risk); color: #221806; }
+  .textbtn {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 6px 4px;
+  }
+  .progress {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  /* document sections */
+  .doc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .doc-head {
+    padding: 14px 18px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+  .doc-head h2 { font-size: 17px; flex: 1 1 auto; }
+  .doc-meta { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .doc-count { font-family: var(--font-mono); font-size: 12px; color: var(--accent); white-space: nowrap; }
+  .doc-body { padding: 14px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .doc.collapsed .doc-body { display: none; }
+  .doc-head .chev { transition: transform 0.15s ease; color: var(--muted); }
+  .doc.collapsed .chev { transform: rotate(-90deg); }
+
+  /* requirement card */
+  .req {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .req[data-reviewed="true"] { opacity: 0.55; }
+  .req-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-weight: 500;
+  }
+  .badge.risk { background: var(--high-risk-bg); color: var(--high-risk); }
+  .conf-row {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .conf-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .req-text { font-size: 14.5px; }
+  blockquote.citation {
+    margin: 0;
+    padding: 8px 10px;
+    background: var(--surface-2);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .high-risk-note {
+    font-size: 12.5px;
+    color: var(--high-risk);
+    display: flex;
+    gap: 6px;
+  }
+  .obligations { display: flex; flex-direction: column; gap: 6px; }
+  .obligation {
+    font-size: 13px;
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 7px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    align-items: baseline;
+  }
+  .obligation .freq {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .review-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: auto;
+    cursor: pointer;
+  }
+  .review-toggle input { accent-color: var(--accent); }
+
+  .empty-state { color: var(--muted); text-align: center; padding: 40px 0; font-family: var(--font-mono); font-size: 13px; }
+
+  @media (max-width: 480px) {
+    .conf-row { margin-left: 0; width: 100%; }
+    .progress { margin-left: 0; width: 100%; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="page-head">
+    <div class="eyebrow">Regulation OS &middot; Phase 1 batch review</div>
+    <h1>State Bank of Pakistan &mdash; 15 circulars, review in progress</h1>
+    <p class="lede">Each requirement shows Draft or Active. Draft means AI-extracted, not yet approved. Rejected duplicate documents are shown greyed out, kept for audit only -- never active. Citations are exact quotes from the OCR'd source page.</p>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="filterbar">
+    <input type="search" id="search" placeholder="Search requirement text, citations, obligations&hellip;" aria-label="Search requirements">
+    <button class="chip risk" id="riskChip" aria-pressed="false">High-risk only</button>
+    <div id="typeChips" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+    <button class="textbtn" id="toggleAll">Collapse all</button>
+    <span class="progress" id="progress"></span>
+  </div>
+
+  <div id="docs"></div>
+  <div class="empty-state" id="emptyState" hidden>No requirements match this filter.</div>
+</div>
+
+<script>
+  const REVIEW_DATA = /*__REVIEW_DATA_JSON__*/ null;
+
+  const CLAUSE_LABELS = {
+    RULE: "Rule",
+    AMENDMENT_TEXT: "Amendment",
+    DEFINITION: "Definition",
+    EXCEPTION: "Exception",
+    PROCEDURE: "Procedure",
+    TABLE_DATA: "Table data",
+  };
+  const CLAUSE_CLASS = {
+    RULE: "rule",
+    AMENDMENT_TEXT: "amendment",
+    DEFINITION: "definition",
+    EXCEPTION: "exception",
+    PROCEDURE: "procedure",
+    TABLE_DATA: "table",
+  };
+
+  function loadReviewed() {
+    try {
+      return JSON.parse(localStorage.getItem("regos_reviewed") || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+  function saveReviewed(state) {
+    try {
+      localStorage.setItem("regos_reviewed", JSON.stringify(state));
+    } catch (e) {
+      /* private browsing / storage blocked -- fine, just don't persist */
+    }
+  }
+  let reviewed = loadReviewed();
+
+  function fmtConf(v) {
+    return v === null || v === undefined ? "&ndash;" : v.toFixed(2);
+  }
+
+  function escapeHtml(s) {
+    return (s || "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+
+  function renderStats(docs) {
+    const totalReq = docs.reduce((a, d) => a + d.requirements.length, 0);
+    const totalRisk = docs.reduce((a, d) => a + d.requirements.filter(r => r.contains_high_risk_language).length, 0);
+    const totalObl = docs.reduce((a, d) => a + d.requirements.reduce((b, r) => b + r.obligations.length, 0), 0);
+    const scores = docs.flatMap(d => d.requirements.map(r => r.confidence_source_match)).filter(v => v !== null && v !== undefined);
+    const avgMatch = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+
+    const tiles = [
+      [docs.length, "documents"],
+      [totalReq, "requirements"],
+      [totalRisk, "flagged high-risk", "risk"],
+      [totalObl, "obligations"],
+      [avgMatch !== null ? avgMatch.toFixed(2) : "&ndash;", "avg. citation match"],
+    ];
+    document.getElementById("stats").innerHTML = tiles.map(([n, l, cls]) =>
+      `<div class="stat ${cls || ""}"><div class="n">${n}</div><div class="l">${l}</div></div>`
+    ).join("");
+  }
+
+  function requirementMatches(req, query, riskOnly, activeTypes) {
+    if (riskOnly && !req.contains_high_risk_language) return false;
+    if (activeTypes.size && !activeTypes.has(req.clause_type)) return false;
+    if (!query) return true;
+    const haystack = [
+      req.requirement_text,
+      req.high_risk_notes,
+      req.citation ? req.citation.quoted_text : "",
+      ...req.obligations.flatMap(o => [o.actor, o.action, o.object]),
+    ].join(" \n ").toLowerCase();
+    return haystack.includes(query);
+  }
+
+  function renderObligation(o) {
+    return `<div class="obligation">
+      <span>${escapeHtml(o.actor)}</span>
+      <span aria-hidden="true">&rarr;</span>
+      <span>${escapeHtml(o.action)}</span>
+      <span aria-hidden="true">&rarr;</span>
+      <span>${escapeHtml(o.object)}</span>
+      ${o.frequency ? `<span class="freq">${escapeHtml(o.frequency.replace("_", " "))}</span>` : ""}
+      ${o.deadline_description ? `<span class="freq">deadline: ${escapeHtml(o.deadline_description)}</span>` : ""}
+    </div>`;
+  }
+
+  function renderRequirement(req) {
+    const isReviewed = !!reviewed[req.id];
+    return `<div class="req" data-id="${req.id}" data-reviewed="${isReviewed}">
+      <div class="req-top">
+        <span class="badge" style="background: color-mix(in srgb, var(--type-${CLAUSE_CLASS[req.clause_type] || 'rule'}) 16%, var(--surface)); color: var(--type-${CLAUSE_CLASS[req.clause_type] || 'rule'});">${CLAUSE_LABELS[req.clause_type] || req.clause_type}</span>
+        ${req.status === "ACTIVE" ? `<span class="badge" style="background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--accent);">Active</span>` : `<span class="badge" style="background: var(--surface-2); color: var(--muted);">Draft</span>`}
+        ${req.contains_high_risk_language ? `<span class="badge risk">High risk</span>` : ""}
+        <span class="conf-row">
+          <span title="extraction confidence">E <b>${fmtConf(req.confidence_extraction)}</b></span>
+          <span title="source-match confidence (computed by fuzzy match, not self-reported)">S <b>${fmtConf(req.confidence_source_match)}</b></span>
+          <span title="classification confidence">C <b>${fmtConf(req.confidence_classification)}</b></span>
+          <span title="interpretation confidence">I <b>${fmtConf(req.confidence_interpretation)}</b></span>
+        </span>
+      </div>
+      <div class="req-text">${escapeHtml(req.requirement_text)}</div>
+      ${req.citation ? `<blockquote class="citation">&ldquo;${escapeHtml(req.citation.quoted_text)}&rdquo;</blockquote>` : ""}
+      ${req.contains_high_risk_language && req.high_risk_notes ? `<div class="high-risk-note">&#9888; ${escapeHtml(req.high_risk_notes)}</div>` : ""}
+      ${req.obligations.length ? `<div class="obligations">${req.obligations.map(renderObligation).join("")}</div>` : ""}
+      <label class="review-toggle">
+        <input type="checkbox" ${isReviewed ? "checked" : ""} data-reviewed-toggle="${req.id}">
+        marked reviewed (this browser only)
+      </label>
+    </div>`;
+  }
+
+  function renderDocs(docs, query, riskOnly, activeTypes) {
+    const container = document.getElementById("docs");
+    let visibleTotal = 0;
+    container.innerHTML = docs.map((doc, di) => {
+      const visible = doc.requirements.filter(r => requirementMatches(r, query, riskOnly, activeTypes));
+      visibleTotal += visible.length;
+      if (!visible.length) return "";
+      return `<section class="doc" data-doc-index="${di}">
+        <div class="doc-head" data-toggle-doc="${di}">
+          <span class="chev" aria-hidden="true">&#9662;</span>
+          <h2>${escapeHtml(doc.title)}</h2>
+          <span class="doc-meta">${escapeHtml(doc.reference_number)} &middot; ${escapeHtml(doc.issue_date)}</span>
+          <span class="doc-count">${visible.length}/${doc.requirements.length}</span>
+        </div>
+        <div class="doc-body">${visible.map(renderRequirement).join("")}</div>
+      </section>`;
+    }).join("");
+    document.getElementById("emptyState").hidden = visibleTotal > 0;
+    updateProgress(docs);
+  }
+
+  function updateProgress(docs) {
+    const total = docs.reduce((a, d) => a + d.requirements.length, 0);
+    const done = docs.reduce((a, d) => a + d.requirements.filter(r => reviewed[r.id]).length, 0);
+    document.getElementById("progress").textContent = `${done}/${total} marked reviewed`;
+  }
+
+  function init() {
+    const docs = REVIEW_DATA.documents;
+    renderStats(docs);
+
+    const allTypes = [...new Set(docs.flatMap(d => d.requirements.map(r => r.clause_type)))];
+    const activeTypes = new Set();
+    document.getElementById("typeChips").innerHTML = allTypes.map(t =>
+      `<button class="chip" data-type="${t}" aria-pressed="false">${CLAUSE_LABELS[t] || t}</button>`
+    ).join("");
+
+    let query = "";
+    let riskOnly = false;
+
+    function rerender() {
+      renderDocs(docs, query, riskOnly, activeTypes);
+      attachRowHandlers();
+    }
+
+    function attachRowHandlers() {
+      document.querySelectorAll("[data-toggle-doc]").forEach(el => {
+        el.addEventListener("click", () => {
+          el.closest(".doc").classList.toggle("collapsed");
+        });
+      });
+      document.querySelectorAll("[data-reviewed-toggle]").forEach(el => {
+        el.addEventListener("change", (e) => {
+          const id = el.getAttribute("data-reviewed-toggle");
+          if (e.target.checked) reviewed[id] = true; else delete reviewed[id];
+          saveReviewed(reviewed);
+          el.closest(".req").setAttribute("data-reviewed", e.target.checked);
+          updateProgress(docs);
+        });
+      });
+    }
+
+    document.getElementById("search").addEventListener("input", (e) => {
+      query = e.target.value.trim().toLowerCase();
+      rerender();
+    });
+    document.getElementById("riskChip").addEventListener("click", (e) => {
+      riskOnly = !riskOnly;
+      e.target.setAttribute("aria-pressed", riskOnly);
+      rerender();
+    });
+    document.getElementById("typeChips").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-type]");
+      if (!btn) return;
+      const t = btn.getAttribute("data-type");
+      if (activeTypes.has(t)) { activeTypes.delete(t); btn.setAttribute("aria-pressed", "false"); }
+      else { activeTypes.add(t); btn.setAttribute("aria-pressed", "true"); }
+      rerender();
+    });
+    let allCollapsed = false;
+    document.getElementById("toggleAll").addEventListener("click", (e) => {
+      allCollapsed = !allCollapsed;
+      document.querySelectorAll(".doc").forEach(d => d.classList.toggle("collapsed", allCollapsed));
+      e.target.textContent = allCollapsed ? "Expand all" : "Collapse all";
+    });
+
+    rerender();
+  }
+
+  init();
+</script>

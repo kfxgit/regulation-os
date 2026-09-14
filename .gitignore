@@ -21,9 +21,12 @@ dist/
 apps/engine/data/incoming/*
 !apps/engine/data/incoming/.gitkeep
 
-# Generated batch-review exports and review pages -- working output for
-# one review session. The real audit trail is the Review table in the
-# database (immutable, with before/after snapshots), not these files.
+# Generated batch-review exports and the data-filled review page --
+# working output for one review session. The real audit trail is the
+# Review table in the database (immutable, with before/after
+# snapshots), not these files. The template itself (apps/engine/
+# templates/review_page.html) IS committed -- it's source code, just
+# kept out of data/.
 apps/engine/data/batch_review_*.json
 apps/engine/data/review_template.html
 apps/engine/data/review_page.html
