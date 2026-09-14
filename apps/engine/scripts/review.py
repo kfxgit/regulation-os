@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.db.session import get_session
-from app.models import Obligation, RegulatoryRequirement, Review
+from app.models import Obligation, RegulatoryRequirement, Review, SourceCitation
 from app.models.enums import ClauseType, ObligationFrequency, RequirementStatus, ReviewDecision
 
 
@@ -111,6 +111,162 @@ def approve_requirement(session, requirement: RegulatoryRequirement, reviewer: s
         )
 
 
+def reject_requirement(session, requirement: RegulatoryRequirement, reviewer: str, notes: str | None = None):
+    """Reject a DRAFT requirement and its obligations: records a Review
+    row per row, but never changes status. A rejected requirement stays
+    DRAFT forever -- it simply never gets promoted to ACTIVE. Nothing is
+    deleted; the rejection itself is the permanent record."""
+    now = datetime.now(timezone.utc)
+
+    if requirement.status == RequirementStatus.DRAFT:
+        snapshot = _requirement_snapshot(requirement)
+        session.add(
+            Review(
+                requirement_id=requirement.id,
+                reviewer_identifier=reviewer,
+                decision=ReviewDecision.REJECTED,
+                before_snapshot=snapshot,
+                after_snapshot=snapshot,  # nothing changes on the row itself
+                notes=notes,
+                reviewed_at=now,
+            )
+        )
+
+    obligations = session.query(Obligation).filter_by(requirement_id=requirement.id).all()
+    for obligation in obligations:
+        if obligation.status != RequirementStatus.DRAFT:
+            continue
+        snapshot = _obligation_snapshot(obligation)
+        session.add(
+            Review(
+                obligation_id=obligation.id,
+                reviewer_identifier=reviewer,
+                decision=ReviewDecision.REJECTED,
+                before_snapshot=snapshot,
+                after_snapshot=snapshot,
+                notes=notes,
+                reviewed_at=now,
+            )
+        )
+
+
+def reject_all_for_document_version(session, document_version_id, reviewer: str, notes: str | None = None) -> int:
+    """Reject every DRAFT requirement for one document version (e.g. an
+    entire ingested file whose content turned out to be fully redundant
+    with another document). Returns the count rejected."""
+    requirements = (
+        session.query(RegulatoryRequirement)
+        .filter_by(document_version_id=document_version_id, status=RequirementStatus.DRAFT)
+        .all()
+    )
+    for requirement in requirements:
+        reject_requirement(session, requirement, reviewer, notes)
+    return len(requirements)
+
+
+def correct_requirement(session, old_requirement: RegulatoryRequirement, corrections: dict, reviewer: str, notes: str | None = None) -> RegulatoryRequirement:
+    """Correct a DRAFT requirement: creates a new revision (same
+    stable_key, revision_number + 1) with the corrections applied,
+    supersedes the old row, and activates the new one -- a human
+    correction during review IS the reviewed, final value, so it goes
+    straight to ACTIVE rather than sitting as another DRAFT needing a
+    separate approval pass.
+
+    Rows are never edited in place (the immutability trigger would
+    reject it anyway) -- this is the same append-a-revision pattern used
+    for regulatory amendments, reused for human corrections.
+    """
+    now = datetime.now(timezone.utc)
+    before = _requirement_snapshot(old_requirement)
+
+    old_citation = (
+        session.query(SourceCitation).filter_by(requirement_id=old_requirement.id).first()
+    )
+
+    new_requirement = RegulatoryRequirement(
+        stable_key=old_requirement.stable_key,
+        revision_number=old_requirement.revision_number + 1,
+        document_version_id=old_requirement.document_version_id,
+        section_id=old_requirement.section_id,
+        clause_type=corrections.get("clause_type", old_requirement.clause_type),
+        requirement_text=corrections.get("requirement_text", old_requirement.requirement_text),
+        status=RequirementStatus.DRAFT,  # citation must exist before ACTIVE -- see below
+        effective_date=old_requirement.effective_date,
+        contains_high_risk_language=old_requirement.contains_high_risk_language,
+        high_risk_notes=old_requirement.high_risk_notes,
+        confidence_extraction=old_requirement.confidence_extraction,
+        confidence_source_match=old_requirement.confidence_source_match,
+        confidence_classification=old_requirement.confidence_classification,
+        confidence_applicability=old_requirement.confidence_applicability,
+        confidence_interpretation=old_requirement.confidence_interpretation,
+        extraction_run_id=old_requirement.extraction_run_id,
+    )
+    session.add(new_requirement)
+    session.flush()
+
+    if old_citation is not None:
+        session.add(
+            SourceCitation(
+                requirement_id=new_requirement.id,
+                document_page_id=old_citation.document_page_id,
+                char_start=old_citation.char_start,
+                char_end=old_citation.char_end,
+                quoted_text=old_citation.quoted_text,
+                match_score=old_citation.match_score,
+            )
+        )
+        session.flush()
+
+    # Now that a citation exists, the DB trigger allows ACTIVE.
+    new_requirement.status = RequirementStatus.ACTIVE
+    session.flush()
+
+    old_requirement.status = RequirementStatus.SUPERSEDED
+    old_requirement.superseded_by_id = new_requirement.id
+    session.flush()
+
+    after = _requirement_snapshot(new_requirement)
+    session.add(
+        Review(
+            requirement_id=old_requirement.id,
+            reviewer_identifier=reviewer,
+            decision=ReviewDecision.CORRECTED,
+            before_snapshot=before,
+            after_snapshot=after,
+            notes=notes,
+            reviewed_at=now,
+        )
+    )
+
+    # Carry obligations forward to the new revision (same pattern: new
+    # row, old one superseded -- Obligation has no immutability trigger,
+    # but the append-a-revision pattern stays consistent regardless).
+    old_obligations = session.query(Obligation).filter_by(requirement_id=old_requirement.id).all()
+    for old_obligation in old_obligations:
+        new_obligation = Obligation(
+            stable_key=old_obligation.stable_key,
+            revision_number=old_obligation.revision_number + 1,
+            requirement_id=new_requirement.id,
+            actor=old_obligation.actor,
+            action=old_obligation.action,
+            object=old_obligation.object,
+            frequency=old_obligation.frequency,
+            deadline_description=old_obligation.deadline_description,
+            status=RequirementStatus.ACTIVE,
+            confidence_extraction=old_obligation.confidence_extraction,
+            confidence_source_match=old_obligation.confidence_source_match,
+            confidence_classification=old_obligation.confidence_classification,
+            extraction_run_id=old_obligation.extraction_run_id,
+        )
+        session.add(new_obligation)
+        session.flush()
+        old_obligation.status = RequirementStatus.SUPERSEDED
+        old_obligation.superseded_by_id = new_obligation.id
+
+    session.flush()
+    return new_requirement
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -121,6 +277,13 @@ def main():
     approve_all.add_argument("document_version_id", type=uuid.UUID)
     approve_all.add_argument("--reviewer", required=True, help="Identifier of the human reviewer, e.g. an email")
     approve_all.add_argument("--notes", default=None)
+
+    reject_document = subparsers.add_parser(
+        "reject-document", help="Reject every DRAFT requirement for one document version (e.g. a redundant duplicate ingestion)"
+    )
+    reject_document.add_argument("document_version_id", type=uuid.UUID)
+    reject_document.add_argument("--reviewer", required=True)
+    reject_document.add_argument("--notes", default=None)
 
     args = parser.parse_args()
     session = get_session()
@@ -138,6 +301,10 @@ def main():
                 approve_requirement(session, requirement, args.reviewer, args.notes)
             session.commit()
             print(f"Approved {len(requirements)} requirement(s) (and their obligations).")
+        elif args.command == "reject-document":
+            count = reject_all_for_document_version(session, args.document_version_id, args.reviewer, args.notes)
+            session.commit()
+            print(f"Rejected {count} requirement(s) (and their obligations). They stay DRAFT, never activated.")
     except Exception:
         session.rollback()
         raise
