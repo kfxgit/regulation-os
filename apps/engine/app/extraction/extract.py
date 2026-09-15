@@ -31,7 +31,17 @@ def extract_requirements(page_text: str, model: str = DEFAULT_MODEL) -> PageExtr
     client = get_anthropic_client()
     response = client.messages.parse(
         model=model,
-        max_tokens=8192,
+        # Found in practice: 8192 was too low. Opus 5 runs thinking by
+        # default at effort="high", and thinking + JSON output share this
+        # same budget -- a dense page (a master circular, a table-heavy
+        # page) can produce enough requirements that the JSON gets cut off
+        # mid-string, which Pydantic then fails to parse. Generous headroom
+        # here, not a tight guess -- but the SDK itself refuses anything
+        # above ~21333 on this non-streaming call (its own timeout math
+        # says that could exceed 10 minutes and demands streaming), so
+        # this is as high as it goes without a bigger change to add
+        # streaming.
+        max_tokens=20000,
         # Interpretation/classification -- the intelligence-sensitive step,
         # unlike OCR's mechanical transcription. Higher effort here.
         output_config={"effort": "high"},
