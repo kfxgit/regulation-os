@@ -3,9 +3,11 @@ import uuid
 from app.models import Obligation, RegulatoryRequirement, Review, SourceCitation
 from app.models.enums import ClauseType, RequirementStatus
 from scripts.review import (
+    approve_relationship,
     approve_requirement,
     correct_requirement,
     reject_all_for_document_version,
+    reject_relationship,
     reject_requirement,
 )
 from tests.factories import (
@@ -14,6 +16,7 @@ from tests.factories import (
     make_document_version,
     make_extraction_run,
     make_obligation,
+    make_relationship,
     make_requirement,
 )
 
@@ -166,6 +169,57 @@ def test_reject_all_for_document_version(db_session):
     assert count == 2
     assert db_session.get(RegulatoryRequirement, req_a.id).status == "DRAFT"
     assert db_session.get(RegulatoryRequirement, req_b.id).status == "DRAFT"
+
+
+def test_approve_relationship_activates_and_records_review(db_session):
+    document_version = make_document_version(db_session)
+    relationship = make_relationship(db_session, document_version)
+    db_session.commit()
+
+    approve_relationship(db_session, relationship, reviewer="reviewer@example.com")
+    db_session.commit()
+
+    reloaded = db_session.get(type(relationship), relationship.id)
+    assert reloaded.status == "ACTIVE"
+
+    review = db_session.query(Review).filter_by(relationship_id=relationship.id).first()
+    assert review.decision == "APPROVED"
+    assert review.before_snapshot["status"] == "DRAFT"
+    assert review.after_snapshot["status"] == "ACTIVE"
+
+
+def test_reject_relationship_stays_draft(db_session):
+    document_version = make_document_version(db_session)
+    relationship = make_relationship(db_session, document_version)
+    db_session.commit()
+
+    reject_relationship(db_session, relationship, reviewer="reviewer@example.com", notes="not a real citation")
+    db_session.commit()
+
+    reloaded = db_session.get(type(relationship), relationship.id)
+    assert reloaded.status == "DRAFT"
+
+    review = db_session.query(Review).filter_by(relationship_id=relationship.id).first()
+    assert review.decision == "REJECTED"
+
+
+def test_approve_relationship_after_reject_is_a_noop_by_default(db_session):
+    document_version = make_document_version(db_session)
+    relationship = make_relationship(db_session, document_version)
+    db_session.commit()
+
+    reject_relationship(db_session, relationship, reviewer="reviewer@example.com")
+    db_session.commit()
+
+    approve_relationship(db_session, relationship, reviewer="reviewer@example.com")
+    db_session.commit()
+
+    reloaded = db_session.get(type(relationship), relationship.id)
+    assert reloaded.status == "DRAFT"
+
+    reviews = db_session.query(Review).filter_by(relationship_id=relationship.id).all()
+    assert len(reviews) == 1
+    assert reviews[0].decision == "REJECTED"
 
 
 def test_correct_requirement_creates_new_revision_and_supersedes_old(db_session):

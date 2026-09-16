@@ -238,6 +238,42 @@ def test_review_must_link_exactly_one_target(db_session, base_chain):
         db_session.commit()
     db_session.rollback()
 
+    # a Review can also target a relationship (the 3rd option), alone
+    relationship = RegulatoryRelationship(
+        from_document_id=document_version.document_id,
+        to_document_id=None,
+        external_reference_text="some external circular",
+        relationship_type=RelationshipType.AMENDS,
+    )
+    db_session.add(relationship)
+    db_session.commit()
+
+    relationship_review = Review(
+        relationship_id=relationship.id,
+        reviewer_identifier="reviewer@example.com",
+        decision=ReviewDecision.APPROVED,
+        before_snapshot={"status": "DRAFT"},
+        after_snapshot={"status": "ACTIVE"},
+        reviewed_at=dt.datetime.now(dt.timezone.utc),
+    )
+    db_session.add(relationship_review)
+    db_session.commit()
+
+    # requirement + relationship together: still invalid (must be exactly one)
+    two_targets_review = Review(
+        requirement_id=requirement.id,
+        relationship_id=relationship.id,
+        reviewer_identifier="reviewer@example.com",
+        decision=ReviewDecision.APPROVED,
+        before_snapshot={},
+        after_snapshot={},
+        reviewed_at=dt.datetime.now(dt.timezone.utc),
+    )
+    db_session.add(two_targets_review)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
 
 # 8. RegulatoryRelationship must link to exactly one target: an in-corpus
 # Document, or an external_reference_text for one we don't hold (yet) --

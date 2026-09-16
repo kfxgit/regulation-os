@@ -15,8 +15,20 @@ import uuid
 from datetime import datetime, timezone
 
 from app.db.session import get_session
-from app.models import Obligation, RegulatoryRequirement, Review, SourceCitation
-from app.models.enums import ClauseType, ObligationFrequency, RequirementStatus, ReviewDecision
+from app.models import (
+    Obligation,
+    RegulatoryRelationship,
+    RegulatoryRequirement,
+    Review,
+    SourceCitation,
+)
+from app.models.enums import (
+    ClauseType,
+    ObligationFrequency,
+    RelationshipType,
+    RequirementStatus,
+    ReviewDecision,
+)
 
 
 def _enum_value(enum_cls, value):
@@ -67,13 +79,28 @@ def _obligation_snapshot(o: Obligation) -> dict:
     }
 
 
-def _latest_decision(session, *, requirement_id=None, obligation_id=None) -> str | None:
-    """The most recent Review decision recorded against this requirement
-    or obligation, or None if it has never been reviewed."""
+def _relationship_snapshot(r: RegulatoryRelationship) -> dict:
+    return {
+        "id": str(r.id),
+        "from_document_id": str(r.from_document_id),
+        "to_document_id": str(r.to_document_id) if r.to_document_id else None,
+        "external_reference_text": r.external_reference_text,
+        "relationship_type": _enum_value(RelationshipType, r.relationship_type),
+        "status": _enum_value(RequirementStatus, r.status),
+        "confidence_extraction": r.confidence_extraction,
+    }
+
+
+def _latest_decision(session, *, requirement_id=None, obligation_id=None, relationship_id=None) -> str | None:
+    """The most recent Review decision recorded against this requirement,
+    obligation, or relationship, or None if it has never been reviewed."""
     query = session.query(Review)
-    query = query.filter_by(requirement_id=requirement_id) if requirement_id else query.filter_by(
-        obligation_id=obligation_id
-    )
+    if requirement_id:
+        query = query.filter_by(requirement_id=requirement_id)
+    elif obligation_id:
+        query = query.filter_by(obligation_id=obligation_id)
+    else:
+        query = query.filter_by(relationship_id=relationship_id)
     latest = query.order_by(Review.reviewed_at.desc()).first()
     return latest.decision if latest else None
 
@@ -186,6 +213,57 @@ def reject_all_for_document_version(session, document_version_id, reviewer: str,
     for requirement in requirements:
         reject_requirement(session, requirement, reviewer, notes)
     return len(requirements)
+
+
+def approve_relationship(
+    session,
+    relationship: RegulatoryRelationship,
+    reviewer: str,
+    notes: str | None = None,
+    override_rejection: bool = False,
+):
+    """Approve one DRAFT relationship. Same rules as approve_requirement:
+    skips anything not DRAFT, and skips anything last REJECTED unless
+    override_rejection=True."""
+    if relationship.status != RequirementStatus.DRAFT:
+        return
+    if not override_rejection and _latest_decision(session, relationship_id=relationship.id) == ReviewDecision.REJECTED.value:
+        return
+
+    before = _relationship_snapshot(relationship)
+    relationship.status = RequirementStatus.ACTIVE
+    session.flush()
+    after = _relationship_snapshot(relationship)
+    session.add(
+        Review(
+            relationship_id=relationship.id,
+            reviewer_identifier=reviewer,
+            decision=ReviewDecision.APPROVED,
+            before_snapshot=before,
+            after_snapshot=after,
+            notes=notes,
+            reviewed_at=datetime.now(timezone.utc),
+        )
+    )
+
+
+def reject_relationship(session, relationship: RegulatoryRelationship, reviewer: str, notes: str | None = None):
+    """Reject a DRAFT relationship: records a Review row, status stays
+    DRAFT forever (same pattern as reject_requirement)."""
+    if relationship.status != RequirementStatus.DRAFT:
+        return
+    snapshot = _relationship_snapshot(relationship)
+    session.add(
+        Review(
+            relationship_id=relationship.id,
+            reviewer_identifier=reviewer,
+            decision=ReviewDecision.REJECTED,
+            before_snapshot=snapshot,
+            after_snapshot=snapshot,
+            notes=notes,
+            reviewed_at=datetime.now(timezone.utc),
+        )
+    )
 
 
 def correct_requirement(session, old_requirement: RegulatoryRequirement, corrections: dict, reviewer: str, notes: str | None = None) -> RegulatoryRequirement:
@@ -309,6 +387,24 @@ def main():
     reject_document.add_argument("--reviewer", required=True)
     reject_document.add_argument("--notes", default=None)
 
+    list_relationships = subparsers.add_parser(
+        "list-relationships", help="List DRAFT relationships pending review"
+    )
+
+    approve_relationship_cmd = subparsers.add_parser(
+        "approve-relationship", help="Approve one DRAFT relationship"
+    )
+    approve_relationship_cmd.add_argument("relationship_id", type=uuid.UUID)
+    approve_relationship_cmd.add_argument("--reviewer", required=True)
+    approve_relationship_cmd.add_argument("--notes", default=None)
+
+    reject_relationship_cmd = subparsers.add_parser(
+        "reject-relationship", help="Reject one DRAFT relationship"
+    )
+    reject_relationship_cmd.add_argument("relationship_id", type=uuid.UUID)
+    reject_relationship_cmd.add_argument("--reviewer", required=True)
+    reject_relationship_cmd.add_argument("--notes", default=None)
+
     args = parser.parse_args()
     session = get_session()
     try:
@@ -329,6 +425,34 @@ def main():
             count = reject_all_for_document_version(session, args.document_version_id, args.reviewer, args.notes)
             session.commit()
             print(f"Rejected {count} requirement(s) (and their obligations). They stay DRAFT, never activated.")
+        elif args.command == "list-relationships":
+            relationships = (
+                session.query(RegulatoryRelationship)
+                .filter_by(status=RequirementStatus.DRAFT)
+                .all()
+            )
+            if not relationships:
+                print("No DRAFT relationships pending review.")
+                return
+            for r in relationships:
+                target = r.external_reference_text or f"document {r.to_document_id}"
+                print(f"{r.id}  {r.relationship_type}  -> {target}  (confidence={r.confidence_extraction})")
+        elif args.command == "approve-relationship":
+            relationship = session.get(RegulatoryRelationship, args.relationship_id)
+            if relationship is None:
+                print("No relationship with that id.")
+                return
+            approve_relationship(session, relationship, args.reviewer, args.notes)
+            session.commit()
+            print("Approved.")
+        elif args.command == "reject-relationship":
+            relationship = session.get(RegulatoryRelationship, args.relationship_id)
+            if relationship is None:
+                print("No relationship with that id.")
+                return
+            reject_relationship(session, relationship, args.reviewer, args.notes)
+            session.commit()
+            print("Rejected. Stays DRAFT, never activated.")
     except Exception:
         session.rollback()
         raise

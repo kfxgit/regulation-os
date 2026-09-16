@@ -11,11 +11,19 @@ from app.models import (
     DocumentVersion,
     ExtractionRun,
     Obligation,
+    RegulatoryRelationship,
     Regulator,
     RegulatoryRequirement,
     SourceCitation,
 )
-from app.models.enums import ClauseType, DocumentType, ExtractionRunStatus, OcrStatus, RequirementStatus
+from app.models.enums import (
+    ClauseType,
+    DocumentType,
+    ExtractionRunStatus,
+    OcrStatus,
+    RelationshipType,
+    RequirementStatus,
+)
 
 
 def make_regulator(session, short_code="TEST"):
@@ -95,6 +103,21 @@ def make_requirement(session, document_version, extraction_run, **overrides):
     session.add(requirement)
     session.flush()
     return requirement
+
+
+def make_relationship(session, from_document_version, **overrides):
+    defaults = dict(
+        from_document_id=from_document_version.document_id,
+        to_document_id=None,
+        external_reference_text="Some External Circular No. 1 of 2020",
+        relationship_type=RelationshipType.AMENDS,
+        status=RequirementStatus.DRAFT,
+    )
+    defaults.update(overrides)
+    relationship = RegulatoryRelationship(**defaults)
+    session.add(relationship)
+    session.flush()
+    return relationship
 
 
 def make_obligation(session, requirement, extraction_run, **overrides):

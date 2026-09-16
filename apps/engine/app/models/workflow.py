@@ -33,13 +33,14 @@ class ExtractionRun(UUIDPKMixin, TimestampMixin, Base):
 
 
 class Review(UUIDPKMixin, TimestampMixin, Base):
-    """A human decision on a DRAFT requirement or obligation. Links to
-    exactly one of the two (never both, never neither)."""
+    """A human decision on a DRAFT requirement, obligation, or
+    relationship. Links to exactly one of the three (never more than
+    one, never none)."""
 
     __tablename__ = "review"
     __table_args__ = (
         CheckConstraint(
-            "(num_nonnulls(requirement_id, obligation_id) = 1)",
+            "(num_nonnulls(requirement_id, obligation_id, relationship_id) = 1)",
             name="ck_review_exactly_one_target",
         ),
     )
@@ -49,6 +50,9 @@ class Review(UUIDPKMixin, TimestampMixin, Base):
     )
     obligation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("obligation.id"), default=None
+    )
+    relationship_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("regulatory_relationship.id"), default=None
     )
     reviewer_identifier: Mapped[str] = mapped_column(String(255))
     decision: Mapped[ReviewDecision] = mapped_column(String(20))
