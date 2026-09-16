@@ -157,9 +157,33 @@ class RegulatoryChange(UUIDPKMixin, TimestampMixin, Base):
 
 class ApplicabilityRule(UUIDPKMixin, TimestampMixin, Base):
     """Who/what a requirement applies to: entity, product, activity, dates.
-    INCLUDES/EXCLUDES scoping sits between Requirement and Obligation."""
+    INCLUDES/EXCLUDES scoping sits between Requirement and Obligation.
+
+    Same resolution-fallback pattern as RegulatoryRelationship: our
+    taxonomies (EntityType/ProductType/BusinessActivity) are thin seed
+    lists, not a comprehensive reference -- so for each dimension, either
+    it resolves to a real taxonomy row (the _id) or the raw text Claude
+    extracted is kept (the _text fallback), never both, and either can be
+    entirely absent if this rule doesn't scope on that dimension. AI-
+    derived like everything else: DRAFT until reviewed, with confidence
+    and a run to trace it back to.
+    """
 
     __tablename__ = "applicability_rule"
+    __table_args__ = (
+        CheckConstraint(
+            "NOT (entity_type_id IS NOT NULL AND entity_type_text IS NOT NULL)",
+            name="ck_applicability_entity_not_both",
+        ),
+        CheckConstraint(
+            "NOT (product_type_id IS NOT NULL AND product_type_text IS NOT NULL)",
+            name="ck_applicability_product_not_both",
+        ),
+        CheckConstraint(
+            "NOT (business_activity_id IS NOT NULL AND business_activity_text IS NOT NULL)",
+            name="ck_applicability_activity_not_both",
+        ),
+    )
 
     requirement_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("regulatory_requirement.id")
@@ -168,12 +192,23 @@ class ApplicabilityRule(UUIDPKMixin, TimestampMixin, Base):
     entity_type_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("entity_type.id"), default=None
     )
+    entity_type_text: Mapped[Optional[str]] = mapped_column(String(255), default=None)
     product_type_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("product_type.id"), default=None
     )
+    product_type_text: Mapped[Optional[str]] = mapped_column(String(255), default=None)
     business_activity_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("business_activity.id"), default=None
     )
+    business_activity_text: Mapped[Optional[str]] = mapped_column(String(255), default=None)
     condition_text: Mapped[Optional[str]] = mapped_column(Text, default=None)
     effective_from: Mapped[Optional[date]] = mapped_column(Date, default=None)
     effective_to: Mapped[Optional[date]] = mapped_column(Date, default=None)
+
+    status: Mapped[RequirementStatus] = mapped_column(
+        String(20), default=RequirementStatus.DRAFT
+    )
+    confidence_extraction: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    extraction_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("extraction_run.id"), default=None
+    )

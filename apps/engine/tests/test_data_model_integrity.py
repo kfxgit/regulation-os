@@ -8,8 +8,14 @@ import uuid
 import pytest
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
-from app.models import Obligation, RegulatoryRelationship, Review
-from app.models.enums import ObligationFrequency, RelationshipType, RequirementStatus, ReviewDecision
+from app.models import ApplicabilityRule, EntityType, Obligation, RegulatoryRelationship, Review
+from app.models.enums import (
+    ObligationFrequency,
+    RelationshipType,
+    RequirementStatus,
+    ReviewDecision,
+    ScopeType,
+)
 from tests.factories import (
     make_citation,
     make_document_page,
@@ -323,6 +329,64 @@ def test_relationship_must_link_exactly_one_target(db_session):
         relationship_type=RelationshipType.AMENDS,
     )
     db_session.add(neither)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+
+# 9. ApplicabilityRule: each dimension (entity/product/activity) is
+# either resolved (an _id) or unresolved (a _text fallback), never both
+# -- our taxonomies are thin seed lists, not a comprehensive reference,
+# so most real extractions won't resolve and that must stay representable.
+def test_applicability_dimensions_never_set_both_id_and_text(db_session, base_chain):
+    document_version, document_page, extraction_run = base_chain
+    requirement = make_requirement(db_session, document_version, extraction_run)
+    make_citation(db_session, requirement, document_page)
+    db_session.commit()
+
+    bank = EntityType(code="TEST_BANK", name="Test Bank")
+    db_session.add(bank)
+    db_session.commit()
+
+    # id only: valid
+    id_only = ApplicabilityRule(
+        requirement_id=requirement.id,
+        scope_type=ScopeType.INCLUDES,
+        entity_type_id=bank.id,
+        entity_type_text=None,
+    )
+    db_session.add(id_only)
+    db_session.commit()
+
+    # text only (unresolved -- the common case given our thin taxonomy): valid
+    text_only = ApplicabilityRule(
+        requirement_id=requirement.id,
+        scope_type=ScopeType.INCLUDES,
+        entity_type_id=None,
+        entity_type_text="DFI",
+    )
+    db_session.add(text_only)
+    db_session.commit()
+
+    # neither (this rule doesn't scope by entity at all): valid
+    neither = ApplicabilityRule(
+        requirement_id=requirement.id,
+        scope_type=ScopeType.EXCLUDES,
+        entity_type_id=None,
+        entity_type_text=None,
+        product_type_text="Digital Wallet",
+    )
+    db_session.add(neither)
+    db_session.commit()
+
+    # both set: invalid
+    both = ApplicabilityRule(
+        requirement_id=requirement.id,
+        scope_type=ScopeType.INCLUDES,
+        entity_type_id=bank.id,
+        entity_type_text="Bank",
+    )
+    db_session.add(both)
     with pytest.raises(IntegrityError):
         db_session.commit()
     db_session.rollback()

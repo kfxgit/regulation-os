@@ -24,6 +24,7 @@ REGULATORS = [
 
 ENTITY_TYPES = [
     {"code": "BANK", "name": "Bank"},
+    {"code": "DFI", "name": "Development Finance Institution"},
     {"code": "MICROFINANCE_BANK", "name": "Microfinance Bank"},
     {"code": "ISLAMIC_BANK", "name": "Islamic Bank"},
     {"code": "EMI", "name": "Electronic Money Institution"},
