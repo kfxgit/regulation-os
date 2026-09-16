@@ -1,9 +1,9 @@
 # Regulation OS — Session Log
 
 A record of the working session that took Regulation OS from an empty folder
-through Phase 0 and the core of Phase 1, including the first real batch of
-SBP circulars reviewed end to end. Not a raw transcript — this captures the
-decisions, what got built, what broke and got fixed, and where things stand.
+through Phase 0, all of Phase 1, and the start of Phase 2 (relationships and
+applicability). Not a raw transcript — this captures the decisions, what got
+built, what broke and got fixed, and where things stand.
 
 ---
 
@@ -277,26 +277,173 @@ credentials.
 
 ---
 
-## 7. Where things stand
+## 7. Closing out Phase 1: 8 more documents, hard cases, and a real batch review
 
-**Phase 0**: complete. **Phase 1 core engine**: complete and proven against
-16 real documents, not just synthetic text.
+The user supplied 8 more real SBP documents, specifically including a master
+circular and table-heavy ones, to close the gap flagged above.
 
-**Genuinely still open, per CLAUDE.md's own quality gates:**
+**A real bug found mid-batch**: one page (`BC_CPD_Circular_No_08.pdf`) was an
+unusually tall scanned page (~46 inches), rendering past the Anthropic API's
+8000px image-dimension limit and crashing the batch. Fixed by clamping any
+oversized render to the limit, preserving aspect ratio, rather than failing
+the whole batch on one page.
 
-- The 20–30 document benchmark corpus should include the *hard cases* —
-  master circulars, real tables, applicability-heavy documents. Across the
-  16 documents processed so far, none was a true master circular, and only
-  a handful of `TABLE_DATA` clauses appeared. Worth deliberately sourcing a
-  document of that shape before calling Phase 1 fully validated.
-- One unresolved item from the user: whether "SBP may also issue specific
-  instructions" should stay `EXCEPTION` (current state) or revert to
-  `RULE` — a follow-up message read as ambiguous rather than a clear
-  reversal, so it was left as `EXCEPTION` pending confirmation.
-- Phase 2 (applicability engine, relationships, versioning, search, change
-  detection, document browser) has not started.
+**A second real bug**: `max_tokens=8192` on the extraction call turned out
+too low for genuinely dense pages once real master circulars and table-heavy
+documents were in the corpus — the JSON response was getting cut off
+mid-string. Raising it to 32000 hit the Anthropic SDK's own non-streaming
+timeout guard (it refuses anything estimated to exceed 10 minutes); settled
+on 20000, the highest safe non-streaming value.
+
+**Twice, the batch also hit real Anthropic API credit exhaustion mid-run** —
+not a code bug, but handled by verifying no partial/corrupt data was left
+behind each time (the uncommitted transaction rolled back cleanly) before
+resuming once credits were restored.
+
+Result: **24 documents total**, including 2 genuine master circulars and 46
+new `TABLE_DATA` clauses (versus a handful before) — the corpus-size and
+hard-case gates from Phase 1's quality gate are both satisfied now.
+
+### The batch review, in detail
+
+The user reviewed the resulting 155 new requirements document-by-document
+and sent back a long, itemized pass. Two things stood out in applying it:
+
+- **A real workflow bug caught by verifying, not trusting, the result**:
+  after rejecting 6 duplicate/fragment rows, a subsequent bulk "approve
+  everything still DRAFT" step silently reactivated those same 6 rows --
+  `reject_requirement()` intentionally leaves status as `DRAFT` (rejected
+  items stay `DRAFT` forever by design), and nothing was checking for a
+  prior rejection before approving. Caught immediately by re-querying the
+  actual data after the script ran, reverted the 6 rows back to `DRAFT`
+  with a Review row explaining the correction, and fixed
+  `approve_requirement()` to refuse reactivating anything last `REJECTED`
+  unless explicitly overridden. Two new tests lock this in.
+- Two items the user flagged as "possibly not in the source, verify" turned
+  out to be genuinely present — confirmed directly against our own stored
+  OCR citations (both exact matches, score 1.0), not by re-reading the PDF.
+  Approved rather than rejected, with the reasoning shown back to the user.
+
+**Final state after this round**: 326 `ACTIVE` requirements, 153 `ACTIVE`
+obligations, 41 `DRAFT` (rejected, preserved for audit), 20 `SUPERSEDED`.
+
+One item stayed genuinely unresolved: whether "SBP may also issue specific
+instructions" should stay `EXCEPTION` (current state) or revert to `RULE` --
+a follow-up message read as ambiguous rather than a clear reversal, left as
+`EXCEPTION` pending confirmation.
 
 ---
 
-*Generated as a session record at the user's request. Reflects the state of
-the project as of 2026-09-15.*
+## 8. Phase 2: relationships and applicability
+
+With Phase 1 closed out, work moved to Phase 2 per the roadmap, starting
+with **Relationships** (the amendment/supersession chain) rather than
+**Applicability**, reversing the original priority order — reasoning: we
+already had real, reviewed evidence sitting unused (`AMENDMENT_TEXT` clauses
+naming exactly what they supersede), making it more bounded and immediately
+provable than applicability's more open-ended taxonomy work.
+
+### Relationships (the amendment resolver)
+
+**A design assumption that would have made the feature produce nothing**:
+the original `RegulatoryRelationship` schema required both documents in a
+relationship to exist in our own corpus. Checking first: zero of 32 real
+`AMENDMENT_TEXT` clauses reference anything we'd actually ingested — every
+reference points to an older circular outside our 24-document corpus.
+Extended the schema before writing any extraction code: `to_document_id`
+became nullable, paired with `external_reference_text` for out-of-corpus
+references (a new check constraint enforces exactly one is set), plus
+`confidence_extraction`, `status` (`DRAFT` by default), and traceability
+fields — the same AI-derived/needs-review pattern as everything else.
+
+**Fuzzy string matching was tried and found unsafe** for resolving document
+references: `rapidfuzz`'s `token_set_ratio` scored "BPRD Circular No. 08" vs
+"No. 10" at 95% similarity — *higher* than a genuine cross-document match
+scored in testing — because circular reference strings share nearly every
+word except the one that actually matters. Replaced with exact matching on
+a parsed `(department code, circular number, year)` tuple, which correctly
+refuses to guess when genuinely ambiguous (proven against real production
+data: two of our own documents are legitimately ambiguous under this
+scheme, and the resolver correctly declines rather than picking one).
+
+**A real extraction-quality bug found by inspecting the first real run's
+output, not just trusting the row count**: feeding the extraction the
+narrow `SourceCitation` quote instead of the already-resolved
+`requirement_text` produced vague, unresolved references like "the above
+referred circular" instead of the actual circular name Phase 1's own
+extraction had already figured out from page context. Fixed the input
+source, deleted the 19 flawed unreviewed rows, and re-ran clean: 24
+relationships extracted. Real proof it works: the eCIB master circular's
+full 7-document supersession chain, correctly split from one sentence
+naming six items (one compound reference parsed into two separate
+relationships).
+
+Also extended `Review` to support `relationship_id` as a third target
+(alongside `requirement_id`/`obligation_id`), with `approve_relationship()`/
+`reject_relationship()` mirroring the requirement versions exactly — the
+user was explicit that reviewing 24 AI-extracted relationships is their
+call, not something "do what you think is best" extends to.
+
+### Applicability (in progress)
+
+**A real taxonomy gap found before writing any extraction code**: scanning
+actual entity mentions across the 367 real requirements found "DFI"/"DFIs"
+71 times — the second most common entity mention after "Bank"/"Banks" — and
+it didn't exist anywhere in the seeded `EntityType` taxonomy. Added it
+first. `ApplicabilityRule` was extended with the same resolution-fallback
+pattern as relationships (per-dimension `_text` fallback columns for
+entity/product/business-activity, each constrained to never be set
+alongside its resolved `_id`), plus the same confidence/status/traceability
+fields, and `Review` was extended again for a fourth target type.
+
+**Validated on a small real sample before committing to the full run** (the
+same discipline as relationships) and found two real quality issues:
+compound entities ("banks'/DFIs'") were inconsistently extracted as one
+unresolvable blob instead of being split; and "banks must submit their CAR
+returns" produced `business_activity: 'submit their CAR returns'` — an
+action, conflating Applicability with Obligation. Fixed the prompt for
+both; re-running the same sample went from 4/17 resolved dimensions to
+16/25, and the noise disappeared. The same real-evidence check also
+surfaced two smaller taxonomy gaps (NBFC, Modaraba) and one abbreviation
+needing a resolver alias rather than a new row (MFB → the existing
+`MICROFINANCE_BANK`).
+
+**Where this stood when the session paused**: the full run (253
+requirements) was started and hit real Anthropic API credit exhaustion
+partway through. This surfaced one more real robustness bug worth noting:
+both extraction scripts only committed once at the very end, so the entire
+run's already-completed work would have been silently discarded on retry.
+Fixed to commit per-document instead — a mid-run failure now only loses the
+current document's in-flight work, and re-running picks up exactly where it
+left off via the existing idempotency check. Not yet re-run at full scale;
+needs API credits restored (the user's action) to resume.
+
+---
+
+## 9. Where things stand
+
+**Phase 0**: complete. **Phase 1**: complete against its own quality gates
+(24-document corpus, master circulars and table-heavy content included,
+326 `ACTIVE` requirements with real human review behind every one).
+**Phase 2**: relationships built and populated (24 real relationships,
+pending the user's review); applicability engine built and validated on a
+sample, full run pending API credits.
+
+**Still open:**
+
+- The applicability engine's full run (253 requirements) — blocked on API
+  credits, not code.
+- The 24 relationships and however many applicability rules follow are all
+  `DRAFT`, awaiting the user's review — deliberately never approved
+  unilaterally.
+- The "SBP may also issue specific instructions" classification question
+  from Phase 1, still unconfirmed.
+- `RegulatoryChange` (change detection), search, and the document browser
+  — the remaining pieces of Phase 2 per the roadmap — not started.
+- The Node/API side remains an intentional `/health` stub, correctly so per
+  the roadmap (it wakes up in Phase 3).
+
+---
+
+*Generated as a session record at the user's request, updated as the work
+continued. Reflects the state of the project as of 2026-09-16.*
