@@ -24,7 +24,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import ClauseType, DocumentType, ObligationFrequency
+from app.models.enums import ClauseType, DocumentType, ObligationFrequency, RelationshipType
 
 
 class ExtractedObligation(BaseModel):
@@ -117,3 +117,35 @@ class ExtractedDocumentMetadata(BaseModel):
     )
     document_type: DocumentType
     confidence_extraction: float = Field(ge=0, le=1)
+
+
+class ExtractedRelationship(BaseModel):
+    """One document-to-document relationship claimed by a clause (usually
+    an AMENDMENT_TEXT one). A single clause can name several documents at
+    once (a master circular superseding six prior letters, say), so the
+    caller collects these into a list, not a single value.
+
+    target_document_reference is the referenced document exactly as
+    named in the text -- resolving that to an actual Document row (or
+    recording it as external, if we don't hold that document) happens
+    later, in app/extraction/relationships.py, never here. This contract
+    only captures what the clause says.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    target_document_reference: str = Field(
+        min_length=1,
+        description="The referenced document exactly as named in the text, e.g. 'BSD Circular No. 05 dated February 14, 2008'.",
+    )
+    relationship_type: RelationshipType
+    confidence_extraction: float = Field(ge=0, le=1)
+
+
+class ExtractedRelationships(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    relationships: list[ExtractedRelationship] = Field(
+        default_factory=list,
+        description="Every document this clause references as amended/replaced/superseded/etc. Empty if the clause does not reference another document.",
+    )

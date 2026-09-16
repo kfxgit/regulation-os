@@ -29,15 +29,15 @@ def make_regulator(session, short_code="TEST"):
     return regulator
 
 
-def make_document_version(session, regulator=None):
+def make_document_version(session, regulator=None, reference_number="TEST-001", issue_date=None, title="Test Circular"):
     regulator = regulator or make_regulator(session, short_code=f"TEST-{uuid.uuid4().hex[:8]}")
 
     document = Document(
         regulator_id=regulator.id,
-        title="Test Circular",
+        title=title,
         document_type=DocumentType.CIRCULAR,
-        reference_number="TEST-001",
-        issue_date=date(2024, 1, 1),
+        reference_number=reference_number,
+        issue_date=issue_date or date(2024, 1, 1),
     )
     session.add(document)
     session.flush()

@@ -8,8 +8,8 @@ import uuid
 import pytest
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
-from app.models import Obligation, Review
-from app.models.enums import ObligationFrequency, RequirementStatus, ReviewDecision
+from app.models import Obligation, RegulatoryRelationship, Review
+from app.models.enums import ObligationFrequency, RelationshipType, RequirementStatus, ReviewDecision
 from tests.factories import (
     make_citation,
     make_document_page,
@@ -234,6 +234,59 @@ def test_review_must_link_exactly_one_target(db_session, base_chain):
         reviewed_at=dt.datetime.now(dt.timezone.utc),
     )
     db_session.add(neither_review)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+
+# 8. RegulatoryRelationship must link to exactly one target: an in-corpus
+# Document, or an external_reference_text for one we don't hold (yet) --
+# never both, never neither. Most real references point outside our
+# corpus, so this isn't an edge case -- it's the common case.
+def test_relationship_must_link_exactly_one_target(db_session):
+    from_version = make_document_version(db_session)
+    to_version = make_document_version(db_session)
+
+    # exactly one target (external reference): valid
+    external_ref = RegulatoryRelationship(
+        from_document_id=from_version.document_id,
+        to_document_id=None,
+        external_reference_text="BSD Circular No. 05 dated February 14, 2008",
+        relationship_type=RelationshipType.SUPERSEDES,
+    )
+    db_session.add(external_ref)
+    db_session.commit()
+
+    # exactly one target (resolved document): valid
+    resolved_ref = RegulatoryRelationship(
+        from_document_id=from_version.document_id,
+        to_document_id=to_version.document_id,
+        external_reference_text=None,
+        relationship_type=RelationshipType.AMENDS,
+    )
+    db_session.add(resolved_ref)
+    db_session.commit()
+
+    # both set: invalid
+    both = RegulatoryRelationship(
+        from_document_id=from_version.document_id,
+        to_document_id=to_version.document_id,
+        external_reference_text="some circular",
+        relationship_type=RelationshipType.AMENDS,
+    )
+    db_session.add(both)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()
+
+    # neither set: invalid
+    neither = RegulatoryRelationship(
+        from_document_id=from_version.document_id,
+        to_document_id=None,
+        external_reference_text=None,
+        relationship_type=RelationshipType.AMENDS,
+    )
+    db_session.add(neither)
     with pytest.raises(IntegrityError):
         db_session.commit()
     db_session.rollback()

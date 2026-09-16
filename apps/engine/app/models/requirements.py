@@ -12,7 +12,17 @@ import uuid
 from datetime import date
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -84,16 +94,46 @@ class SourceCitation(UUIDPKMixin, TimestampMixin, Base):
 
 
 class RegulatoryRelationship(UUIDPKMixin, TimestampMixin, Base):
+    """AMENDS/REPLACES/SUPERSEDES etc. between documents.
+
+    In practice, a clause usually references an older circular that
+    isn't (yet) in our own corpus -- so to_document_id is optional: when
+    the target resolves to a real Document we hold, we link it; when it
+    doesn't, we still record what was referenced (external_reference_text)
+    rather than silently drop it. Exactly one of the two is always set
+    (never both, never neither -- same pattern as Review's exactly-one
+    target). AI-derived like everything else here: DRAFT until reviewed,
+    with confidence and traceability back to the clause that claimed it.
+    """
+
     __tablename__ = "regulatory_relationship"
+    __table_args__ = (
+        CheckConstraint(
+            "(num_nonnulls(to_document_id, external_reference_text) = 1)",
+            name="ck_relationship_exactly_one_target",
+        ),
+    )
 
     from_document_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("document.id")
     )
-    to_document_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("document.id")
+    to_document_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("document.id"), default=None
     )
+    external_reference_text: Mapped[Optional[str]] = mapped_column(Text, default=None)
     relationship_type: Mapped[RelationshipType] = mapped_column(String(30))
     description: Mapped[Optional[str]] = mapped_column(Text, default=None)
+
+    status: Mapped[RequirementStatus] = mapped_column(
+        String(20), default=RequirementStatus.DRAFT
+    )
+    confidence_extraction: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    source_requirement_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("regulatory_requirement.id"), default=None
+    )
+    extraction_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("extraction_run.id"), default=None
+    )
 
 
 class RegulatoryChange(UUIDPKMixin, TimestampMixin, Base):
