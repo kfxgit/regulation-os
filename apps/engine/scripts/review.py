@@ -67,32 +67,56 @@ def _obligation_snapshot(o: Obligation) -> dict:
     }
 
 
-def approve_requirement(session, requirement: RegulatoryRequirement, reviewer: str, notes: str | None = None):
+def _latest_decision(session, *, requirement_id=None, obligation_id=None) -> str | None:
+    """The most recent Review decision recorded against this requirement
+    or obligation, or None if it has never been reviewed."""
+    query = session.query(Review)
+    query = query.filter_by(requirement_id=requirement_id) if requirement_id else query.filter_by(
+        obligation_id=obligation_id
+    )
+    latest = query.order_by(Review.reviewed_at.desc()).first()
+    return latest.decision if latest else None
+
+
+def approve_requirement(
+    session,
+    requirement: RegulatoryRequirement,
+    reviewer: str,
+    notes: str | None = None,
+    override_rejection: bool = False,
+):
     """Approve one DRAFT requirement and every obligation linked to it.
-    Records a Review row per row activated. Skips anything not DRAFT,
-    so this is safe to re-run."""
+    Records a Review row per row activated. Skips anything not DRAFT
+    (safe to re-run) and -- critically -- skips anything whose most
+    recent review was REJECTED, since a rejected item stays DRAFT
+    forever by design (see reject_requirement), and a bulk "approve
+    everything still DRAFT" pass must never silently reactivate it.
+    Pass override_rejection=True for a deliberate reversal."""
     now = datetime.now(timezone.utc)
 
     if requirement.status == RequirementStatus.DRAFT:
-        before = _requirement_snapshot(requirement)
-        requirement.status = RequirementStatus.ACTIVE
-        session.flush()
-        after = _requirement_snapshot(requirement)
-        session.add(
-            Review(
-                requirement_id=requirement.id,
-                reviewer_identifier=reviewer,
-                decision=ReviewDecision.APPROVED,
-                before_snapshot=before,
-                after_snapshot=after,
-                notes=notes,
-                reviewed_at=now,
+        if override_rejection or _latest_decision(session, requirement_id=requirement.id) != ReviewDecision.REJECTED.value:
+            before = _requirement_snapshot(requirement)
+            requirement.status = RequirementStatus.ACTIVE
+            session.flush()
+            after = _requirement_snapshot(requirement)
+            session.add(
+                Review(
+                    requirement_id=requirement.id,
+                    reviewer_identifier=reviewer,
+                    decision=ReviewDecision.APPROVED,
+                    before_snapshot=before,
+                    after_snapshot=after,
+                    notes=notes,
+                    reviewed_at=now,
+                )
             )
-        )
 
     obligations = session.query(Obligation).filter_by(requirement_id=requirement.id).all()
     for obligation in obligations:
         if obligation.status != RequirementStatus.DRAFT:
+            continue
+        if not override_rejection and _latest_decision(session, obligation_id=obligation.id) == ReviewDecision.REJECTED.value:
             continue
         before = _obligation_snapshot(obligation)
         obligation.status = RequirementStatus.ACTIVE

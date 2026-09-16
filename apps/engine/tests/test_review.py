@@ -104,6 +104,52 @@ def test_reject_leaves_status_draft_but_records_review(db_session):
     assert all(r.decision == "REJECTED" for r in reviews)
 
 
+def test_approve_after_reject_is_a_noop_by_default(db_session):
+    """Reproduces a real bug: reject_requirement() intentionally leaves
+    status=DRAFT (rejected items stay DRAFT forever), which meant a
+    later bulk 'approve everything still DRAFT' pass silently reactivated
+    an explicitly-rejected item. approve_requirement() must refuse to
+    activate anything whose most recent review was REJECTED, unless
+    override_rejection=True is passed deliberately."""
+    requirement, obligation = _setup(db_session)
+
+    reject_requirement(db_session, requirement, reviewer="reviewer@example.com", notes="duplicate")
+    db_session.commit()
+
+    # A blind bulk-approve pass over "everything still DRAFT" must not
+    # reactivate this -- it's still DRAFT (by design) but was rejected.
+    approve_requirement(db_session, requirement, reviewer="reviewer@example.com")
+    db_session.commit()
+
+    reloaded_requirement = db_session.get(type(requirement), requirement.id)
+    reloaded_obligation = db_session.get(type(obligation), obligation.id)
+    assert reloaded_requirement.status == "DRAFT"
+    assert reloaded_obligation.status == "DRAFT"
+
+    reviews = (
+        db_session.query(Review)
+        .filter(
+            (Review.requirement_id == requirement.id) | (Review.obligation_id == obligation.id)
+        )
+        .all()
+    )
+    assert len(reviews) == 2  # just the two REJECTED reviews, no APPROVED added
+    assert all(r.decision == "REJECTED" for r in reviews)
+
+
+def test_approve_after_reject_works_with_explicit_override(db_session):
+    requirement, obligation = _setup(db_session)
+
+    reject_requirement(db_session, requirement, reviewer="reviewer@example.com", notes="duplicate")
+    db_session.commit()
+
+    approve_requirement(db_session, requirement, reviewer="reviewer@example.com", override_rejection=True)
+    db_session.commit()
+
+    reloaded_requirement = db_session.get(type(requirement), requirement.id)
+    assert reloaded_requirement.status == "ACTIVE"
+
+
 def test_reject_all_for_document_version(db_session):
     document_version = make_document_version(db_session)
     page = make_document_page(db_session, document_version)
