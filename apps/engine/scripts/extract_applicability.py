@@ -39,6 +39,8 @@ def main():
     args = parser.parse_args()
 
     session = get_session()
+    documents_completed = 0
+    by_document_version = {}
     try:
         already_processed_ids = {
             row[0] for row in session.query(ApplicabilityRule.requirement_id).all()
@@ -126,15 +128,18 @@ def main():
 
             extraction_run.status = ExtractionRunStatus.SUCCEEDED
             extraction_run.completed_at = datetime.now(timezone.utc)
+            session.commit()  # per document -- a mid-run failure (e.g. API credits) only loses the current document's progress, not everything
+            documents_completed += 1
 
-        session.commit()
         print(
-            f"\nextracted {total_extracted} applicability rule(s) across {len(requirements)} requirement(s): "
+            f"\nextracted {total_extracted} applicability rule(s) across {len(requirements)} requirement(s) "
+            f"in {documents_completed} document(s): "
             f"{total_resolved_dims} dimension(s) resolved to our taxonomy, "
             f"{total_unresolved_dims} unresolved (kept as text). All DRAFT, pending review."
         )
     except Exception:
         session.rollback()
+        print(f"\nFailed after completing {documents_completed}/{len(by_document_version)} document(s) -- their extractions were already committed and won't be re-run. Re-run this script to continue from where it left off.")
         raise
     finally:
         session.close()
