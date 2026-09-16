@@ -10,10 +10,11 @@ to resolve each reference to a Document row we actually hold.
 from app.core.ai_client import DEFAULT_MODEL, get_anthropic_client
 from app.extraction.schema import ExtractedRelationships
 
-RELATIONSHIP_PROMPT_TEMPLATE = """This is a clause from an official regulatory document. It may reference one or more other regulatory documents (a circular, letter, or notification it amends, replaces, or supersedes).
+RELATIONSHIP_PROMPT_TEMPLATE = """This is a clause from an official regulatory document. It may reference one or more other specific regulatory documents (a circular, letter, or notification it amends, replaces, or supersedes).
 
 Rules:
-- Only extract a relationship if this clause explicitly names another document (by circular number, letter number, or a clear description) and states how it relates to it.
+- Only extract a relationship if this clause names a SPECIFIC document: something with an identifiable circular/letter number, a date, or both (e.g. "BSD Circular No. 05 dated February 14, 2008", "IBD Circular No. 2 of April 29, 2004").
+- Do NOT extract a general framework, standard, or regime name as a document reference -- "the Basel Framework", "Basel III", "SBP regulations", "the prudential regulations" are not specific documents. Skip these.
 - target_document_reference must be the referenced document exactly as named in the text -- do not normalize, abbreviate, or guess a fuller name than what is written.
 - relationship_type: choose the closest match.
   - AMENDS: this document changes part of the referenced one, without fully replacing it
