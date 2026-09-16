@@ -24,7 +24,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import ClauseType, DocumentType, ObligationFrequency, RelationshipType
+from app.models.enums import ClauseType, DocumentType, ObligationFrequency, RelationshipType, ScopeType
 
 
 class ExtractedObligation(BaseModel):
@@ -148,4 +148,46 @@ class ExtractedRelationships(BaseModel):
     relationships: list[ExtractedRelationship] = Field(
         default_factory=list,
         description="Every document this clause references as amended/replaced/superseded/etc. Empty if the clause does not reference another document.",
+    )
+
+
+class ExtractedApplicabilityRule(BaseModel):
+    """Who/what one clause says it applies to (or explicitly doesn't).
+    Resolving entity_type/product_type/business_activity against our
+    taxonomy tables (or keeping them as unresolved text) happens later,
+    in app/extraction/applicability_resolver.py, never here.
+
+    At least one of entity_type/product_type/business_activity/
+    condition_text must be set -- an empty rule with nothing scoped
+    carries no information and should not be extracted.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope_type: ScopeType
+    entity_type: Optional[str] = Field(
+        default=None,
+        description="Who this applies to, exactly as named (e.g. 'Banks', 'DFIs', 'Islamic Banking Subsidiaries'). Null if this rule does not scope by entity type.",
+    )
+    product_type: Optional[str] = Field(
+        default=None,
+        description="What product this applies to, exactly as named (e.g. 'Digital Wallet', 'BNPL'). Null if this rule does not scope by product.",
+    )
+    business_activity: Optional[str] = Field(
+        default=None,
+        description="What business activity this applies to, exactly as named (e.g. 'Cross-border remittance'). Null if this rule does not scope by activity.",
+    )
+    condition_text: Optional[str] = Field(
+        default=None,
+        description="Any additional qualifying condition beyond entity/product/activity, exactly as stated (e.g. 'with majority foreign shareholding greater than 50%', 'sold through digital channels'). Null if none.",
+    )
+    confidence_extraction: float = Field(ge=0, le=1)
+
+
+class ExtractedApplicabilityRules(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rules: list[ExtractedApplicabilityRule] = Field(
+        default_factory=list,
+        description="Every applicability scoping this clause states (who/what it applies to, or is explicitly excluded from). Empty if the clause states no scoping at all.",
     )

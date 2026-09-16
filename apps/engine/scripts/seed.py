@@ -31,6 +31,8 @@ ENTITY_TYPES = [
     {"code": "PSO", "name": "Payment System Operator"},
     {"code": "PSP", "name": "Payment Service Provider"},
     {"code": "EXCHANGE_COMPANY", "name": "Exchange Company"},
+    {"code": "NBFC", "name": "Non-Bank Finance Company"},
+    {"code": "MODARABA", "name": "Modaraba"},
 ]
 
 PRODUCT_TYPES = [
