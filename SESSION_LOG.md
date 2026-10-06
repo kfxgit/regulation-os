@@ -327,10 +327,18 @@ and sent back a long, itemized pass. Two things stood out in applying it:
 **Final state after this round**: 326 `ACTIVE` requirements, 153 `ACTIVE`
 obligations, 41 `DRAFT` (rejected, preserved for audit), 20 `SUPERSEDED`.
 
-One item stayed genuinely unresolved: whether "SBP may also issue specific
-instructions" should stay `EXCEPTION` (current state) or revert to `RULE` --
-a follow-up message read as ambiguous rather than a clear reversal, left as
-`EXCEPTION` pending confirmation.
+One item stayed genuinely unresolved at the time: whether "SBP may also issue
+specific instructions" should stay `EXCEPTION` (current state) or revert to
+`RULE` -- a follow-up message read as ambiguous rather than a clear
+reversal, left as `EXCEPTION` pending confirmation.
+  - Closed 2026-10-06: confirmed `EXCEPTION` is correct (a reservation of
+    authority -- SBP reserving the right to issue further instructions,
+    not an obligation on banks/participants) and recorded as a standalone
+    `APPROVED` Review row against the ACTIVE requirement, since the
+    classification itself wasn't changing (the existing `correct_requirement()`
+    flow is for an actual reclassification; this was a confirm-as-is
+    decision, so `approve_requirement()` would have silently no-op'd on an
+    already-ACTIVE row instead of recording anything).
 
 ---
 
@@ -504,19 +512,18 @@ forever by design, never silently reactivated).
 
 ---
 
-## 10. Where things stand
+## 10. Where things stood at this point
 
 **Phase 0**: complete. **Phase 1**: complete against its own quality gates
 (24-document corpus, master circulars and table-heavy content included,
-326 `ACTIVE` requirements with real human review behind every one).
+326 `ACTIVE` requirements with real human review behind every one, including
+the one classification item above, now closed).
 **Phase 2**: relationships and applicability both built, run against the
 full corpus, and fully human-reviewed (24/24 relationships, 326/333
 applicability rules active; 7 deliberately rejected).
 
-**Still open:**
+**Open at this point (see section 12+ for what closed these):**
 
-- The "SBP may also issue specific instructions" classification question
-  from Phase 1, still unconfirmed.
 - `RegulatoryChange` (change detection), search, and the document browser
   — the remaining pieces of Phase 2 per the roadmap — not started.
 - The Node/API side remains an intentional `/health` stub, correctly so per
@@ -544,6 +551,112 @@ Added a `LICENSE` (all-rights-reserved / proprietary notice — the repo is a
 product, not an open-source library) and updated `README.md`, which had
 drifted badly out of date (still describing Phase 1 as "next," with all of
 Phase 1 and most of Phase 2 actually complete).
+
+Separately, GitHub's secret scanning runs automatically on every public
+repo (no toggle exists for it) and push protection was enabled manually
+(Settings → Code security) as the ongoing safety net future sessions won't
+have to re-derive by manual sweep each time.
+
+---
+
+## 12. Scoping the confidence-score principle, and a dead column found along the way
+
+CLAUDE.md's "five separate confidence scores" principle was written before
+`RegulatoryRelationship`/`ApplicabilityRule` existed and never got revisited
+once they did — both tables had carried only `confidence_extraction` since
+Phase 2 began, silently under-delivering on the stated principle. Added
+`confidence_classification` (AI self-reported: is `relationship_type`/
+`scope_type` correct) and `confidence_source_match` (code-computed via the
+same fuzzy-match approach as requirement citations — applicability rules
+take the *minimum* score across whichever dimensions were actually
+extracted, so one weak dimension flags the row rather than being averaged
+away) to both tables. The existing 357 rows are `NULL` on both new columns,
+deliberately not backfilled — `confidence_classification` would mean
+re-judging an already-reviewed decision, and `confidence_source_match`
+can't be reconstructed for resolved rows (resolution discards the original
+extracted text).
+
+While verifying which scores actually apply to which table, found a real
+pre-existing gap: `RegulatoryRequirement.confidence_applicability` and
+`Obligation.confidence_applicability` had existed since Phase 0 but were
+never populated by any extraction code (confirmed 0/387 and 0/337 rows
+non-null). Removed both columns. The regulatory_requirement immutability
+trigger referenced the column by name in its content-change check, so the
+trigger function had to be replaced in both migration directions before
+the column could be dropped — caught by checking the trigger body directly
+rather than assuming autogenerate would handle it (it doesn't see trigger
+bodies, only column/constraint DDL). Verified by actually running the
+downgrade and re-upgrade against the real database, not just reading the
+migration code: columns and the full trigger body came back correctly on
+downgrade, and the immutability trigger still fired correctly on the
+re-upgrade.
+
+## 13. Structured + full-text search
+
+The engine's first real query surface beyond `/health`, per CLAUDE.md
+section 6 ("search" is a stated engine responsibility). Full-text search
+uses Postgres's built-in `to_tsvector`/`websearch_to_tsquery` against a
+functional GIN index — no new dependency, and no stored tsvector column to
+maintain, since `requirement_text` never changes after insert (the
+immutability trigger forbids it). `GET /search/requirements` supports a
+text query plus structured filters (clause type, status — defaults to
+`ACTIVE` only, entity type via a join to `ApplicabilityRule`, high-risk-only,
+document). Semantic search stays deferred until pgvector is installed.
+
+8 tests, two of them deliberately built around a nonsense search token
+rather than real banking vocabulary ("mutual fund," "reserve requirement")
+— this runs against the real shared `regos` database with hundreds of
+already-committed SBP clauses, so an exact-count or exact-empty assertion
+built from real terminology would be flaky against that real content, not
+actually testing the filter logic. Verified end-to-end with a live
+`uvicorn` smoke test before committing, not just the unit tests.
+
+## 14. Impact analysis, instead of populating RegulatoryChange
+
+Before writing anything, checked whether `RegulatoryChange` could actually
+be wired up from the 24 real relationships now that they existed, reviewed.
+It can't, yet: 0 of the 24 relationships resolve to a `Document` the corpus
+holds content for — every one points to an external circular outside the
+24-document corpus. `RegulatoryChange.old_requirement_id` would be `NULL`
+on every row written today; there's no real clause-level diff to store.
+
+Built `GET /documents/{id}/impact` directly over `RegulatoryRelationship`
+instead, which already has 24 real, reviewed rows. Three distinct things,
+each labeled for what it actually is: `outgoing` (relationships this
+document makes), `incoming_resolved` (another document names this one via
+a real foreign key — always empty today, correct once a cross-document
+pair both get ingested), and `incoming_candidates` (NOT a resolved link —
+reuses the same exact department+number+year parser
+`relationship_resolver.py` already uses for real resolution, run in
+reverse against a document's own reference number, to surface
+relationships whose `external_reference_text` looks like it might mean
+this document — labeled as candidates and never conflated with
+`incoming_resolved`, same reasoning that ruled out fuzzy string matching
+for real resolution earlier in Phase 2). `RegulatoryChange` itself stays
+schema-only, deferred until there's a real same-document version or a real
+old-document ingestion to diff against — a recorded decision, not a silent
+gap.
+
+5 tests (using the same `ZZZTEST` department-code isolation pattern as the
+relationship resolver tests, for the same reason: real circular reference
+numbers already exist in the shared database). Verified live against a
+real document's real supersession chain (BC & CPD Circular No. 06 of
+2021's eCIB master circular, superseding 7 real prior letters) before
+committing.
+
+## 15. Closing the one open Phase 1 item
+
+Confirmed "SBP may also issue specific instructions to the participating
+institutions from time to time" should stay classified `EXCEPTION` (a
+reservation of authority — SBP reserving the right to issue further
+instructions, not an obligation on banks/participants) rather than revert
+to `RULE`. Recorded as a standalone `APPROVED` Review row against the
+already-`ACTIVE` requirement: `approve_requirement()` only acts on `DRAFT`
+rows and would have silently no-op'd here, and `correct_requirement()` is
+for an actual reclassification, not a confirm-as-is decision — so this
+needed a direct Review insert to get recorded at all, rather than leaving
+the confirmation only in chat history outside the system's own audit
+trail.
 
 ---
 
