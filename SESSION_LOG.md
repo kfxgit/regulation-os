@@ -420,22 +420,101 @@ needs API credits restored (the user's action) to resume.
 
 ---
 
-## 9. Where things stand
+## 9. Phase 2 review: 24 relationships, 333 applicability rules
+
+With API credits restored, the full applicability run (253 requirements)
+completed, and both queues — 24 relationships, 333 applicability rules —
+were ready for human review. Raw CLI review (one command per item) wasn't
+going to scale, so the same pattern used for the 367-requirement review was
+repeated: a second published review page
+(`templates/review2_page.html`), grouped by document → requirement, nested
+relationships and applicability rules shown with resolved/unresolved status
+and confidence inline, filterable by search / unresolved-only /
+relationships-only / applicability-only.
+
+### 9.1 A review-tooling bug caught before acting on it
+
+The three filter views (Unresolved Only / Relationships Only / Applicability
+Only) are overlapping filters on the same underlying rows, not separate
+copies — but the user's review pass, done view-by-view, read an item
+appearing in two filtered views as a duplicated database row and flagged
+~12 relationships and 7 applicability rules as "duplicates to reject,"
+while *also* approving those same IDs elsewhere in the same review (by
+content, correctly). Checked before acting: every flagged ID exists exactly
+once in the underlying data. Resolved the contradiction by honoring
+whichever call was backed by actual content reasoning — approve for the 12
+relationships (the user's own note on them: "not errors... acceptable"),
+reject for 7 applicability rules where a specific, separate low-confidence/
+exception argument had been made (not just the view-overlap artifact).
+
+### 9.2 Taxonomy extension, backed by real counts
+
+The user's review flagged ~30 applicability rows stuck unresolved on
+taxonomy gaps, not wrong extractions (e.g. "branches," "Participants,"
+"Digital Banks," "auditors," "Raast"). Before adding anything, queried
+actual mention counts across the extracted data to confirm each was real,
+not a one-off: 11 mentions of branch-level terms, 10 of Raast-participant
+terms, 4 of "Islamic banking subsidiary," 2 each of "Digital Banks" and
+"auditors." Added 7 entity types (Branch, Raast Participant, Digital Bank,
+External Auditor, Islamic Banking Subsidiary, Currency Chest, Sub-Chest)
+and 6 product types (Raast, MTS, TTS, DDS, Claim Notes, Clearly Payable
+Defective Notes) — the three-letter cash-management codes (MTS/TTS/DDS)
+were deliberately named exactly as extracted rather than guessing their
+expansion, since the source text never spells them out. Added a
+`_PRODUCT_ALIASES` dict (products previously had no alias mechanism, only
+entities did) and fixed a real normalizer bug along the way: the plural-
+stripping logic turned "branches" into "branche", not "branch," silently
+failing every branch-related match until caught.
+
+Re-ran the backfill (no new AI calls, pure re-resolution against the
+grown taxonomy): 51 previously-unresolved rows resolved. Two items stayed
+deliberately unresolved rather than force a guess — an overly specific
+product phrase and a business-activity dimension with no real taxonomy fit.
+
+Also added `correct_relationship()` to `scripts/review.py`: unlike
+`RegulatoryRequirement`, `RegulatoryRelationship` has no
+`stable_key`/`revision_number` — it isn't immutable — so a correction edits
+`relationship_type` in place and activates, recording one `CORRECTED`
+review, rather than the append-a-revision pattern requirements use.
+
+### 9.3 A second, more interesting mistake — this time on both sides
+
+After applying ~314/333 applicability decisions, 19 rows remained
+unaccounted for, all tied to a document called "BPRD 14 (Letter)" — the
+user hadn't reviewed them and said so plainly when asked. The user then
+described what they expected that content to be, from memory of the source
+PDF: Core Principles compliance-assessment instructions (audit firm
+engagement, compliance grading I–IV, a 15/30-day deadline pair). Querying
+the actual stored requirement text before accepting that description
+showed it didn't match at all — "BPRD 14 (Letter)" is a Basel III / Capital
+Adequacy implementation letter (same family as the BSD/IBD superseding
+relationships already reviewed), not the Core Principles letter. That
+content lives in the *other* "BPRD 14" (no suffix), which had already been
+reviewed. Presented the real 10 clauses + 19 applicability rows instead of
+the remembered ones; the user reviewed the actual content and approved all
+of it. Worth recording precisely because it went both ways in one exchange:
+first a tooling-side misreading (the view-overlap "duplicates"), then a
+memory-side misattribution (the wrong document's content) — both caught by
+checking the database directly rather than trusting either side's
+recollection.
+
+**Final state**: 24/24 relationships `ACTIVE`. 326/333 applicability rules
+`ACTIVE`, 7 `DRAFT` (the user's deliberate rejections — stay `DRAFT`
+forever by design, never silently reactivated).
+
+---
+
+## 10. Where things stand
 
 **Phase 0**: complete. **Phase 1**: complete against its own quality gates
 (24-document corpus, master circulars and table-heavy content included,
 326 `ACTIVE` requirements with real human review behind every one).
-**Phase 2**: relationships built and populated (24 real relationships,
-pending the user's review); applicability engine built and validated on a
-sample, full run pending API credits.
+**Phase 2**: relationships and applicability both built, run against the
+full corpus, and fully human-reviewed (24/24 relationships, 326/333
+applicability rules active; 7 deliberately rejected).
 
 **Still open:**
 
-- The applicability engine's full run (253 requirements) — blocked on API
-  credits, not code.
-- The 24 relationships and however many applicability rules follow are all
-  `DRAFT`, awaiting the user's review — deliberately never approved
-  unilaterally.
 - The "SBP may also issue specific instructions" classification question
   from Phase 1, still unconfirmed.
 - `RegulatoryChange` (change detection), search, and the document browser
@@ -445,5 +524,28 @@ sample, full run pending API credits.
 
 ---
 
+## 11. Repository made public
+
+The repo (`github.com/kfxgit/regulation-os`) was switched from private to
+public. Before anything further was pushed, a sweep checked for anything
+that shouldn't be exposed: no `.env` file, API key, or database credential
+was ever committed (checked the current tree and the full history, not
+just `git status`); no source PDFs or other large binaries were ever
+committed; `.gitignore` had correctly kept all of that out from the start.
+
+One real finding: a personal email address was hardcoded in
+`apps/engine/pyproject.toml`'s `authors` field (a leftover default from
+`uv init`), and the same address is separately baked into every commit's
+author metadata across the whole git history — the latter is permanent
+short of a disruptive history rewrite, which wasn't done. Replaced the
+`pyproject.toml` copy with a GitHub-provided noreply address
+(`{id}+{username}@users.noreply.github.com`) so no *new* file repeats it.
+Added a `LICENSE` (all-rights-reserved / proprietary notice — the repo is a
+product, not an open-source library) and updated `README.md`, which had
+drifted badly out of date (still describing Phase 1 as "next," with all of
+Phase 1 and most of Phase 2 actually complete).
+
+---
+
 *Generated as a session record at the user's request, updated as the work
-continued. Reflects the state of the project as of 2026-09-16.*
+continued. Reflects the state of the project as of 2026-10-06.*

@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Regulation OS engine: OCR, AI extraction, verification, knowledge base"
 readme = "README.md"
 authors = [
-    { name = "kfxgit", email = "kaneezenoori@gmail.com" }
+    { name = "kfxgit", email = "143092605+kfxgit@users.noreply.github.com" }
 ]
 requires-python = ">=3.11"
 dependencies = [

@@ -96,9 +96,10 @@ ObligationAssignment.
 
 ## 8. Roadmap
 
-- Phase 0 (CURRENT): v2 data model — 16 regulation tables, migration, seed data, 7 database tests that prove the integrity rules
-- Phase 1: extraction engine — Pydantic extraction contract, Claude prompt, OCR pipeline (pdf2image + Claude vision), source verification, gold-standard dataset (100+ hand-checked clauses from a 20–30 document SBP corpus)
-- Phase 2: regulatory intelligence — applicability engine, relationships, versioning, search (full-text + semantic), change detection, document browser
+- Phase 0 (COMPLETE): v2 data model — 16 regulation tables, migration, seed data, 9 database tests that prove the integrity rules
+  - Updated 2026-10-06: grew from 7 to 9 tests as Phase 2 added relationship/applicability constraints.
+- Phase 1 (COMPLETE): extraction engine — Pydantic extraction contract, Claude prompt, OCR pipeline (pdf2image + Claude vision), source verification, 24-document real SBP corpus ingested and human-reviewed end to end (326 ACTIVE requirements)
+- Phase 2 (IN PROGRESS, CURRENT): regulatory intelligence — relationships and the applicability engine are built, run against the full corpus, and human-reviewed (24 relationships, 333 applicability rules). Still open: versioning, search (full-text + semantic), change detection, document browser
 - Phase 3: compliance engine — obligations workflow, controls, evidence, tasks, assessments, dashboards (Node side wakes up here)
 - Phase 4: FinTech compliance packs (EMI/PSP/wallet/BNPL workflows)
 - Phase 5: multi-regulator (SECP + others)
@@ -108,7 +109,7 @@ ObligationAssignment.
 
 - The data model is not "done" until 100 hand-reviewed real clauses fit in it.
 - Every schema change = Alembic migration, never manual edits.
-- The 7 model tests must stay green at all times.
+- The 9 model tests must stay green at all times.
 - Before scaling to hundreds of documents: the 20–30 doc benchmark corpus must pass end-to-end, including the hard cases (master circulars, partial amendments, tables, definitions, applicability-heavy documents).
 
 ## 10. How I want you to work
