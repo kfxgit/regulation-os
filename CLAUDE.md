@@ -88,9 +88,11 @@ SourceCitation (page + char span proof), Obligation (canonical, tenant-free),
 RegulatoryRelationship (AMENDS / REPLACES / PARTIALLY_REPLACES / etc.),
 EntityType / ProductType / BusinessActivity (hierarchical lists),
 ApplicabilityRule (INCLUDES/EXCLUDES scoping), RegulatoryChange (added/
-modified/repealed/moved — backbone of impact analysis), ExtractionRun
-(every AI job logged: model, version, prompt version — run-to-run
-comparability), Review (human decisions with before/after snapshots).
+modified/repealed/moved — backbone of impact analysis, schema exists,
+population deferred, see below), ExtractionRun (every AI job logged:
+model, version, prompt version — run-to-run comparability), Review
+(human decisions with before/after snapshots).
+  - Updated 2026-10-06: RegulatoryChange is NOT populated from the 24 real relationships, by design decision. Checked first: 0/24 relationships resolve to a Document we hold content for (every one points to an external circular outside the corpus), so old_requirement_id would be NULL on every row written today -- no real clause-level diff to store. Built app/impact.py + GET /documents/{id}/impact instead: a query surface directly over RegulatoryRelationship (outgoing edges, incoming resolved-by-FK edges, and incoming "candidate" edges found by the same exact department+number+year parser relationship_resolver.py uses, clearly labeled unconfirmed, never silently treated as resolved). RegulatoryChange stays schema-only until either a same-document new version is ingested, or one of the externally-referenced old circulars gets ingested for real.
 
 App tables (Node-owned, later phase): Organization, User, Task, Alert.
 Compliance tables (Phase 3+): Control, Evidence, ComplianceAssessment,
