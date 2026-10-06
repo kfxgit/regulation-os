@@ -20,6 +20,8 @@ import re
 # code instead) -- normalized alias -> normalized target code.
 _ENTITY_ALIASES = {
     "mfb": "microfinance bank",
+    "member fi": "fi",
+    "lead/agent fi": "fi",
 }
 
 

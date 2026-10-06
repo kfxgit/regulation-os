@@ -43,6 +43,12 @@ def test_resolve_entity_type_matches_via_known_alias(db_session):
     assert resolved.code == "MICROFINANCE_BANK"
 
 
+def test_resolve_entity_type_matches_member_fi_alias(db_session):
+    resolved = resolve_entity_type(db_session, "Member FIs")
+    assert resolved is not None
+    assert resolved.code == "FI"
+
+
 def test_resolve_product_type_matches_plain_name(db_session):
     resolved = resolve_product_type(db_session, "Digital Wallet")
     assert resolved is not None

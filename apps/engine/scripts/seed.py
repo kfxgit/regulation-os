@@ -33,6 +33,7 @@ ENTITY_TYPES = [
     {"code": "EXCHANGE_COMPANY", "name": "Exchange Company"},
     {"code": "NBFC", "name": "Non-Bank Finance Company"},
     {"code": "MODARABA", "name": "Modaraba"},
+    {"code": "FI", "name": "Financial Institution"},
 ]
 
 PRODUCT_TYPES = [
