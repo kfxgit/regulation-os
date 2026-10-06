@@ -93,6 +93,8 @@ def _relationship_snapshot(r: RegulatoryRelationship) -> dict:
         "relationship_type": _enum_value(RelationshipType, r.relationship_type),
         "status": _enum_value(RequirementStatus, r.status),
         "confidence_extraction": r.confidence_extraction,
+        "confidence_classification": r.confidence_classification,
+        "confidence_source_match": r.confidence_source_match,
     }
 
 
@@ -110,6 +112,8 @@ def _applicability_snapshot(a: ApplicabilityRule) -> dict:
         "condition_text": a.condition_text,
         "status": _enum_value(RequirementStatus, a.status),
         "confidence_extraction": a.confidence_extraction,
+        "confidence_classification": a.confidence_classification,
+        "confidence_source_match": a.confidence_source_match,
     }
 
 

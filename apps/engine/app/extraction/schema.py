@@ -2,17 +2,40 @@
 before any AI output is trusted (see CLAUDE.md section 4, "AI is not the
 source of truth").
 
-Where the five confidence scores come from (they don't all live here):
+CLAUDE.md section 4 says "five separate confidence scores, never one
+generic score" -- that's the full set on RegulatoryRequirement, but not
+every score has a meaningful analog on every table. RegulatoryRelationship
+and ApplicabilityRule only carry three: confidence_extraction,
+confidence_classification, confidence_source_match. The other two don't
+apply -- confidence_interpretation has no separate "meaning" to extract
+beyond the extraction itself for these rows, and confidence_applicability
+would be circular on a table whose entire row IS the applicability
+judgment.
+
+Where each score comes from (they don't all live in this file):
   - confidence_extraction      -- self-reported by Claude in this contract
+                                   (all three tables)
   - confidence_classification  -- self-reported by Claude in this contract
+                                   (all three tables: clause_type /
+                                   relationship_type / scope_type)
   - confidence_interpretation  -- self-reported by Claude in this contract
+                                   (RegulatoryRequirement only)
   - confidence_source_match    -- computed later by OUR fuzzy-match code
                                    (app/extraction/verification.py), never
                                    self-reported -- the AI doesn't get to
-                                   grade its own citation accuracy
-  - confidence_applicability   -- belongs to ApplicabilityRule, Phase 2
-                                   scope (the applicability engine), not
-                                   produced by this contract
+                                   grade its own citation accuracy (all
+                                   three tables; requirements match against
+                                   the page's raw OCR text, relationships/
+                                   applicability rules match against the
+                                   parent requirement_text they were
+                                   derived from)
+  - confidence_applicability   -- a column on RegulatoryRequirement, but
+                                   currently always NULL: nothing in this
+                                   contract or the pipeline populates it
+                                   (ApplicabilityRule.confidence_extraction
+                                   covers that job now, on its own table).
+                                   Left alone here -- out of scope for this
+                                   change, flagged for a separate decision
 
 No defaults on confidence or high-risk fields: if Claude's response is
 missing one, Pydantic validation fails loudly rather than the field
@@ -140,6 +163,11 @@ class ExtractedRelationship(BaseModel):
     )
     relationship_type: RelationshipType
     confidence_extraction: float = Field(ge=0, le=1)
+    confidence_classification: float = Field(
+        ge=0,
+        le=1,
+        description="Confidence that relationship_type is the correct classification (e.g. AMENDS vs SUPERSEDES vs REFERENCES), separate from confidence in having found a reference at all.",
+    )
 
 
 class ExtractedRelationships(BaseModel):
@@ -182,6 +210,11 @@ class ExtractedApplicabilityRule(BaseModel):
         description="Any additional qualifying condition beyond entity/product/activity, exactly as stated (e.g. 'with majority foreign shareholding greater than 50%', 'sold through digital channels'). Null if none.",
     )
     confidence_extraction: float = Field(ge=0, le=1)
+    confidence_classification: float = Field(
+        ge=0,
+        le=1,
+        description="Confidence that scope_type (INCLUDES vs EXCLUDES) is correct, separate from confidence in having found a scoping statement at all.",
+    )
 
 
 class ExtractedApplicabilityRules(BaseModel):

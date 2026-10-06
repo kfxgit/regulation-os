@@ -36,11 +36,8 @@ _ENTITY_ALIASES = {
     "participant bank": "raast participant",
     "raast participant bank": "raast participant",
     "participating institution": "raast participant",
-    "digital bank": "digital bank",
     "auditor": "external auditor",
-    "islamic banking subsidiary": "islamic banking subsidiary",
     "chest": "currency chest",
-    "sub-chest": "sub-chest",
 }
 
 _PRODUCT_ALIASES = {

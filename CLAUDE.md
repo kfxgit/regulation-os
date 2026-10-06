@@ -54,7 +54,9 @@ regulatory language to actual business operations.
 - NOTHING IS DELETED. When a circular amends a rule: new revision added, old revision marked SUPERSEDED, full history preserved, change recorded.
 - REQUIREMENTS ARE IMMUTABLE. Amendments append revisions; never edit rows.
 - HIGH-RISK FIELDS GET EXTRA VERIFICATION. Money, percentages, dates, deadlines, thresholds, prohibition language. "must not exceed 10%" must NEVER become "must exceed 10%".
-- FIVE SEPARATE CONFIDENCE SCORES, never one generic score: extraction, source_match, classification, applicability, interpretation.
+- FIVE SEPARATE CONFIDENCE SCORES, never one generic score: extraction, source_match, classification, applicability, interpretation. The full five apply to RegulatoryRequirement. RegulatoryRelationship and ApplicabilityRule carry only the three that have a real meaning for them (extraction, classification, source_match) -- applicability is circular on a table that IS the applicability judgment, and interpretation doesn't add anything beyond extraction for a single reference/scope value. source_match is always computed by code (fuzzy match), never self-reported, on every table that has it.
+  - Updated 2026-10-06: added confidence_classification + confidence_source_match to RegulatoryRelationship and ApplicabilityRule (previously only confidence_extraction). Existing rows from before this change are NULL on both new columns -- not backfilled, since confidence_classification would mean re-judging an already-reviewed decision and confidence_source_match could only be backfilled for the resolved rows, not the ones where the original extracted text was already discarded by resolution. NULL means "not computed for this batch", not zero.
+  - Also noted: RegulatoryRequirement.confidence_applicability has existed since Phase 0 but is never populated by any extraction code -- ApplicabilityRule.confidence_extraction (its own table) does that job now. Left as NULL, not wired up; a decision for later, not a bug fixed here.
 
 ## 5. Scope strategy
 

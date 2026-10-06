@@ -23,6 +23,7 @@ from app.core.ai_client import DEFAULT_MODEL
 from app.db.session import get_session
 from app.extraction.relationship_resolver import resolve_document_reference
 from app.extraction.relationships import extract_relationships
+from app.extraction.verification import find_citation
 from app.models import (
     DocumentVersion,
     ExtractionRun,
@@ -89,6 +90,13 @@ def main():
 
                 for extracted in result.relationships:
                     total_extracted += 1
+                    # confidence_source_match: does target_document_reference
+                    # actually appear in the text it was extracted from --
+                    # computed by code, never self-reported (same principle
+                    # as requirement citations, see verification.py).
+                    source_match = find_citation(
+                        extracted.target_document_reference, requirement.requirement_text
+                    ).match_score
                     target_document = resolve_document_reference(
                         session, extracted.target_document_reference
                     )
@@ -114,6 +122,8 @@ def main():
                             ),
                             relationship_type=extracted.relationship_type,
                             confidence_extraction=extracted.confidence_extraction,
+                            confidence_classification=extracted.confidence_classification,
+                            confidence_source_match=source_match,
                             source_requirement_id=requirement.id,
                             extraction_run_id=extraction_run.id,
                         )

@@ -26,6 +26,7 @@ from app.extraction.applicability_resolver import (
     resolve_entity_type,
     resolve_product_type,
 )
+from app.extraction.verification import find_citation
 from app.models import ApplicabilityRule, DocumentVersion, ExtractionRun, RegulatoryRequirement
 from app.models.enums import ExtractionRunStatus
 
@@ -82,6 +83,22 @@ def main():
                 for extracted in result.rules:
                     total_extracted += 1
 
+                    # confidence_source_match: does every extracted text
+                    # field actually appear in the text it was extracted
+                    # from -- computed by code, never self-reported (same
+                    # principle as requirement citations). A rule can scope
+                    # on several dimensions at once; take the worst match,
+                    # not the average -- one fabricated-looking dimension
+                    # should flag the whole row for review, not get diluted.
+                    extracted_texts = [
+                        t for t in [extracted.entity_type, extracted.product_type, extracted.business_activity, extracted.condition_text]
+                        if t is not None
+                    ]
+                    source_match = min(
+                        (find_citation(t, requirement.requirement_text).match_score for t in extracted_texts),
+                        default=None,
+                    )
+
                     entity = resolve_entity_type(session, extracted.entity_type) if extracted.entity_type else None
                     product = resolve_product_type(session, extracted.product_type) if extracted.product_type else None
                     activity = (
@@ -122,6 +139,8 @@ def main():
                             business_activity_text=None if activity else extracted.business_activity,
                             condition_text=extracted.condition_text,
                             confidence_extraction=extracted.confidence_extraction,
+                            confidence_classification=extracted.confidence_classification,
+                            confidence_source_match=source_match,
                             extraction_run_id=extraction_run.id,
                         )
                     )

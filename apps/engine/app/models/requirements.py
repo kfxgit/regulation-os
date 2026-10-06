@@ -128,6 +128,8 @@ class RegulatoryRelationship(UUIDPKMixin, TimestampMixin, Base):
         String(20), default=RequirementStatus.DRAFT
     )
     confidence_extraction: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    confidence_classification: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    confidence_source_match: Mapped[Optional[float]] = mapped_column(Float, default=None)
     source_requirement_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("regulatory_requirement.id"), default=None
     )
@@ -209,6 +211,8 @@ class ApplicabilityRule(UUIDPKMixin, TimestampMixin, Base):
         String(20), default=RequirementStatus.DRAFT
     )
     confidence_extraction: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    confidence_classification: Mapped[Optional[float]] = mapped_column(Float, default=None)
+    confidence_source_match: Mapped[Optional[float]] = mapped_column(Float, default=None)
     extraction_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("extraction_run.id"), default=None
     )
