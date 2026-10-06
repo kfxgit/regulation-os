@@ -6,6 +6,7 @@ import uuid
 from datetime import date, datetime, timezone
 
 from app.models import (
+    ApplicabilityRule,
     Document,
     DocumentPage,
     DocumentVersion,
@@ -23,6 +24,7 @@ from app.models.enums import (
     OcrStatus,
     RelationshipType,
     RequirementStatus,
+    ScopeType,
 )
 
 
@@ -118,6 +120,21 @@ def make_relationship(session, from_document_version, **overrides):
     session.add(relationship)
     session.flush()
     return relationship
+
+
+def make_applicability_rule(session, requirement, **overrides):
+    defaults = dict(
+        requirement_id=requirement.id,
+        scope_type=ScopeType.INCLUDES,
+        entity_type_id=None,
+        entity_type_text="Banks",
+        status=RequirementStatus.DRAFT,
+    )
+    defaults.update(overrides)
+    rule = ApplicabilityRule(**defaults)
+    session.add(rule)
+    session.flush()
+    return rule
 
 
 def make_obligation(session, requirement, extraction_run, **overrides):

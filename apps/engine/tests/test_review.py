@@ -3,14 +3,17 @@ import uuid
 from app.models import Obligation, RegulatoryRequirement, Review, SourceCitation
 from app.models.enums import ClauseType, RequirementStatus
 from scripts.review import (
+    approve_applicability,
     approve_relationship,
     approve_requirement,
     correct_requirement,
     reject_all_for_document_version,
+    reject_applicability,
     reject_relationship,
     reject_requirement,
 )
 from tests.factories import (
+    make_applicability_rule,
     make_citation,
     make_document_page,
     make_document_version,
@@ -218,6 +221,57 @@ def test_approve_relationship_after_reject_is_a_noop_by_default(db_session):
     assert reloaded.status == "DRAFT"
 
     reviews = db_session.query(Review).filter_by(relationship_id=relationship.id).all()
+    assert len(reviews) == 1
+    assert reviews[0].decision == "REJECTED"
+
+
+def test_approve_applicability_activates_and_records_review(db_session):
+    requirement, _obligation = _setup(db_session)
+    rule = make_applicability_rule(db_session, requirement)
+    db_session.commit()
+
+    approve_applicability(db_session, rule, reviewer="reviewer@example.com")
+    db_session.commit()
+
+    reloaded = db_session.get(type(rule), rule.id)
+    assert reloaded.status == "ACTIVE"
+
+    review = db_session.query(Review).filter_by(applicability_rule_id=rule.id).first()
+    assert review.decision == "APPROVED"
+    assert review.before_snapshot["status"] == "DRAFT"
+    assert review.after_snapshot["status"] == "ACTIVE"
+
+
+def test_reject_applicability_stays_draft(db_session):
+    requirement, _obligation = _setup(db_session)
+    rule = make_applicability_rule(db_session, requirement)
+    db_session.commit()
+
+    reject_applicability(db_session, rule, reviewer="reviewer@example.com", notes="not actually scoped")
+    db_session.commit()
+
+    reloaded = db_session.get(type(rule), rule.id)
+    assert reloaded.status == "DRAFT"
+
+    review = db_session.query(Review).filter_by(applicability_rule_id=rule.id).first()
+    assert review.decision == "REJECTED"
+
+
+def test_approve_applicability_after_reject_is_a_noop_by_default(db_session):
+    requirement, _obligation = _setup(db_session)
+    rule = make_applicability_rule(db_session, requirement)
+    db_session.commit()
+
+    reject_applicability(db_session, rule, reviewer="reviewer@example.com")
+    db_session.commit()
+
+    approve_applicability(db_session, rule, reviewer="reviewer@example.com")
+    db_session.commit()
+
+    reloaded = db_session.get(type(rule), rule.id)
+    assert reloaded.status == "DRAFT"
+
+    reviews = db_session.query(Review).filter_by(applicability_rule_id=rule.id).all()
     assert len(reviews) == 1
     assert reviews[0].decision == "REJECTED"
 

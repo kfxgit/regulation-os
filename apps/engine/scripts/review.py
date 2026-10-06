@@ -16,7 +16,11 @@ from datetime import datetime, timezone
 
 from app.db.session import get_session
 from app.models import (
+    ApplicabilityRule,
+    BusinessActivity,
+    EntityType,
     Obligation,
+    ProductType,
     RegulatoryRelationship,
     RegulatoryRequirement,
     Review,
@@ -28,6 +32,7 @@ from app.models.enums import (
     RelationshipType,
     RequirementStatus,
     ReviewDecision,
+    ScopeType,
 )
 
 
@@ -91,16 +96,38 @@ def _relationship_snapshot(r: RegulatoryRelationship) -> dict:
     }
 
 
-def _latest_decision(session, *, requirement_id=None, obligation_id=None, relationship_id=None) -> str | None:
+def _applicability_snapshot(a: ApplicabilityRule) -> dict:
+    return {
+        "id": str(a.id),
+        "requirement_id": str(a.requirement_id),
+        "scope_type": _enum_value(ScopeType, a.scope_type),
+        "entity_type_id": str(a.entity_type_id) if a.entity_type_id else None,
+        "entity_type_text": a.entity_type_text,
+        "product_type_id": str(a.product_type_id) if a.product_type_id else None,
+        "product_type_text": a.product_type_text,
+        "business_activity_id": str(a.business_activity_id) if a.business_activity_id else None,
+        "business_activity_text": a.business_activity_text,
+        "condition_text": a.condition_text,
+        "status": _enum_value(RequirementStatus, a.status),
+        "confidence_extraction": a.confidence_extraction,
+    }
+
+
+def _latest_decision(
+    session, *, requirement_id=None, obligation_id=None, relationship_id=None, applicability_rule_id=None
+) -> str | None:
     """The most recent Review decision recorded against this requirement,
-    obligation, or relationship, or None if it has never been reviewed."""
+    obligation, relationship, or applicability rule, or None if it has
+    never been reviewed."""
     query = session.query(Review)
     if requirement_id:
         query = query.filter_by(requirement_id=requirement_id)
     elif obligation_id:
         query = query.filter_by(obligation_id=obligation_id)
-    else:
+    elif relationship_id:
         query = query.filter_by(relationship_id=relationship_id)
+    else:
+        query = query.filter_by(applicability_rule_id=applicability_rule_id)
     latest = query.order_by(Review.reviewed_at.desc()).first()
     return latest.decision if latest else None
 
@@ -266,6 +293,57 @@ def reject_relationship(session, relationship: RegulatoryRelationship, reviewer:
     )
 
 
+def approve_applicability(
+    session,
+    rule: ApplicabilityRule,
+    reviewer: str,
+    notes: str | None = None,
+    override_rejection: bool = False,
+):
+    """Approve one DRAFT applicability rule. Same rules as the others:
+    skips anything not DRAFT, and skips anything last REJECTED unless
+    override_rejection=True."""
+    if rule.status != RequirementStatus.DRAFT:
+        return
+    if not override_rejection and _latest_decision(session, applicability_rule_id=rule.id) == ReviewDecision.REJECTED.value:
+        return
+
+    before = _applicability_snapshot(rule)
+    rule.status = RequirementStatus.ACTIVE
+    session.flush()
+    after = _applicability_snapshot(rule)
+    session.add(
+        Review(
+            applicability_rule_id=rule.id,
+            reviewer_identifier=reviewer,
+            decision=ReviewDecision.APPROVED,
+            before_snapshot=before,
+            after_snapshot=after,
+            notes=notes,
+            reviewed_at=datetime.now(timezone.utc),
+        )
+    )
+
+
+def reject_applicability(session, rule: ApplicabilityRule, reviewer: str, notes: str | None = None):
+    """Reject a DRAFT applicability rule: records a Review row, status
+    stays DRAFT forever (same pattern as reject_requirement)."""
+    if rule.status != RequirementStatus.DRAFT:
+        return
+    snapshot = _applicability_snapshot(rule)
+    session.add(
+        Review(
+            applicability_rule_id=rule.id,
+            reviewer_identifier=reviewer,
+            decision=ReviewDecision.REJECTED,
+            before_snapshot=snapshot,
+            after_snapshot=snapshot,
+            notes=notes,
+            reviewed_at=datetime.now(timezone.utc),
+        )
+    )
+
+
 def correct_requirement(session, old_requirement: RegulatoryRequirement, corrections: dict, reviewer: str, notes: str | None = None) -> RegulatoryRequirement:
     """Correct a DRAFT requirement: creates a new revision (same
     stable_key, revision_number + 1) with the corrections applied,
@@ -405,6 +483,25 @@ def main():
     reject_relationship_cmd.add_argument("--reviewer", required=True)
     reject_relationship_cmd.add_argument("--notes", default=None)
 
+    list_applicability = subparsers.add_parser(
+        "list-applicability", help="List DRAFT applicability rules pending review"
+    )
+    list_applicability.add_argument("--requirement-id", type=uuid.UUID, default=None, help="Only list rules for one requirement")
+
+    approve_applicability_cmd = subparsers.add_parser(
+        "approve-applicability", help="Approve one DRAFT applicability rule"
+    )
+    approve_applicability_cmd.add_argument("rule_id", type=uuid.UUID)
+    approve_applicability_cmd.add_argument("--reviewer", required=True)
+    approve_applicability_cmd.add_argument("--notes", default=None)
+
+    reject_applicability_cmd = subparsers.add_parser(
+        "reject-applicability", help="Reject one DRAFT applicability rule"
+    )
+    reject_applicability_cmd.add_argument("rule_id", type=uuid.UUID)
+    reject_applicability_cmd.add_argument("--reviewer", required=True)
+    reject_applicability_cmd.add_argument("--notes", default=None)
+
     args = parser.parse_args()
     session = get_session()
     try:
@@ -451,6 +548,42 @@ def main():
                 print("No relationship with that id.")
                 return
             reject_relationship(session, relationship, args.reviewer, args.notes)
+            session.commit()
+            print("Rejected. Stays DRAFT, never activated.")
+        elif args.command == "list-applicability":
+            query = session.query(ApplicabilityRule).filter_by(status=RequirementStatus.DRAFT)
+            if args.requirement_id:
+                query = query.filter_by(requirement_id=args.requirement_id)
+            rules = query.all()
+            if not rules:
+                print("No DRAFT applicability rules pending review.")
+                return
+            for a in rules:
+                entity = a.entity_type_text or (
+                    session.get(EntityType, a.entity_type_id).name if a.entity_type_id else None
+                )
+                product = a.product_type_text or (
+                    session.get(ProductType, a.product_type_id).name if a.product_type_id else None
+                )
+                activity = a.business_activity_text or (
+                    session.get(BusinessActivity, a.business_activity_id).name if a.business_activity_id else None
+                )
+                dims = ", ".join(d for d in [entity, product, activity] if d) or "(no dimension)"
+                print(f"{a.id}  req={a.requirement_id}  {a.scope_type}: {dims}  condition={a.condition_text!r}  (confidence={a.confidence_extraction})")
+        elif args.command == "approve-applicability":
+            rule = session.get(ApplicabilityRule, args.rule_id)
+            if rule is None:
+                print("No applicability rule with that id.")
+                return
+            approve_applicability(session, rule, args.reviewer, args.notes)
+            session.commit()
+            print("Approved.")
+        elif args.command == "reject-applicability":
+            rule = session.get(ApplicabilityRule, args.rule_id)
+            if rule is None:
+                print("No applicability rule with that id.")
+                return
+            reject_applicability(session, rule, args.reviewer, args.notes)
             session.commit()
             print("Rejected. Stays DRAFT, never activated.")
     except Exception:
