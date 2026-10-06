@@ -62,7 +62,6 @@ def _requirement_snapshot(r: RegulatoryRequirement) -> dict:
         "confidence_extraction": r.confidence_extraction,
         "confidence_source_match": r.confidence_source_match,
         "confidence_classification": r.confidence_classification,
-        "confidence_applicability": r.confidence_applicability,
         "confidence_interpretation": r.confidence_interpretation,
     }
 
@@ -415,7 +414,6 @@ def correct_requirement(session, old_requirement: RegulatoryRequirement, correct
         confidence_extraction=old_requirement.confidence_extraction,
         confidence_source_match=old_requirement.confidence_source_match,
         confidence_classification=old_requirement.confidence_classification,
-        confidence_applicability=old_requirement.confidence_applicability,
         confidence_interpretation=old_requirement.confidence_interpretation,
         extraction_run_id=old_requirement.extraction_run_id,
     )

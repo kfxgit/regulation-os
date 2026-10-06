@@ -154,8 +154,10 @@ def test_supersede_preserves_old_row(db_session, base_chain):
     assert len(rows_for_stable_key) == 2  # both revisions still present
 
 
-# 6. FIVE SEPARATE CONFIDENCE SCORES, never one generic score
-def test_five_confidence_scores_are_independent(db_session, base_chain):
+# 6. SEPARATE CONFIDENCE SCORES, never one generic score. RegulatoryRequirement
+# carries four (applicability now lives on ApplicabilityRule.confidence_extraction
+# instead, one score per scoping rule rather than one aggregate column here).
+def test_confidence_scores_are_independent(db_session, base_chain):
     document_version, _document_page, extraction_run = base_chain
     requirement = make_requirement(
         db_session,
@@ -164,7 +166,6 @@ def test_five_confidence_scores_are_independent(db_session, base_chain):
         confidence_extraction=0.95,
         confidence_source_match=0.80,
         confidence_classification=0.70,
-        confidence_applicability=0.60,
         confidence_interpretation=0.50,
     )
     db_session.commit()
@@ -174,10 +175,9 @@ def test_five_confidence_scores_are_independent(db_session, base_chain):
         reloaded.confidence_extraction,
         reloaded.confidence_source_match,
         reloaded.confidence_classification,
-        reloaded.confidence_applicability,
         reloaded.confidence_interpretation,
     }
-    assert scores == {0.95, 0.80, 0.70, 0.60, 0.50}  # 5 distinct values, 5 distinct columns
+    assert scores == {0.95, 0.80, 0.70, 0.50}  # 4 distinct values, 4 distinct columns
 
 
 # 7. Review links to exactly one of requirement / obligation

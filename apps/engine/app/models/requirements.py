@@ -62,12 +62,14 @@ class RegulatoryRequirement(UUIDPKMixin, TimestampMixin, Base):
     contains_high_risk_language: Mapped[bool] = mapped_column(Boolean)
     high_risk_notes: Mapped[Optional[str]] = mapped_column(Text, default=None)
 
-    # Five separate confidence scores. Never a single generic score.
-    # No silent defaults: missing stays NULL, never 0.
+    # Separate confidence scores, never a single generic score. No silent
+    # defaults: missing stays NULL, never 0. The applicability dimension
+    # lives on ApplicabilityRule.confidence_extraction (its own table, one
+    # score per scoping rule) now, not as a fifth column here -- see
+    # CLAUDE.md section 4.
     confidence_extraction: Mapped[Optional[float]] = mapped_column(Float, default=None)
     confidence_source_match: Mapped[Optional[float]] = mapped_column(Float, default=None)
     confidence_classification: Mapped[Optional[float]] = mapped_column(Float, default=None)
-    confidence_applicability: Mapped[Optional[float]] = mapped_column(Float, default=None)
     confidence_interpretation: Mapped[Optional[float]] = mapped_column(Float, default=None)
 
     extraction_run_id: Mapped[uuid.UUID] = mapped_column(

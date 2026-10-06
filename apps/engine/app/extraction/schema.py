@@ -2,21 +2,23 @@
 before any AI output is trusted (see CLAUDE.md section 4, "AI is not the
 source of truth").
 
-CLAUDE.md section 4 says "five separate confidence scores, never one
-generic score" -- that's the full set on RegulatoryRequirement, but not
-every score has a meaningful analog on every table. RegulatoryRelationship
-and ApplicabilityRule only carry three: confidence_extraction,
-confidence_classification, confidence_source_match. The other two don't
-apply -- confidence_interpretation has no separate "meaning" to extract
-beyond the extraction itself for these rows, and confidence_applicability
-would be circular on a table whose entire row IS the applicability
-judgment.
+CLAUDE.md section 4's confidence-score principle isn't one fixed list of
+five columns on every table -- each table carries whichever scores have a
+real, distinct meaning for it:
+  - RegulatoryRequirement: extraction, source_match, classification,
+    interpretation (four -- applicability was dropped as a column here;
+    see below)
+  - RegulatoryRelationship / ApplicabilityRule: extraction, classification,
+    source_match (three -- applicability would be circular on a table
+    whose entire row IS the applicability judgment, and interpretation
+    doesn't add anything beyond extraction for a single reference/scope
+    value)
 
 Where each score comes from (they don't all live in this file):
   - confidence_extraction      -- self-reported by Claude in this contract
-                                   (all three tables)
+                                   (all tables)
   - confidence_classification  -- self-reported by Claude in this contract
-                                   (all three tables: clause_type /
+                                   (all tables: clause_type /
                                    relationship_type / scope_type)
   - confidence_interpretation  -- self-reported by Claude in this contract
                                    (RegulatoryRequirement only)
@@ -24,18 +26,18 @@ Where each score comes from (they don't all live in this file):
                                    (app/extraction/verification.py), never
                                    self-reported -- the AI doesn't get to
                                    grade its own citation accuracy (all
-                                   three tables; requirements match against
-                                   the page's raw OCR text, relationships/
+                                   tables; requirements match against the
+                                   page's raw OCR text, relationships/
                                    applicability rules match against the
                                    parent requirement_text they were
                                    derived from)
-  - confidence_applicability   -- a column on RegulatoryRequirement, but
-                                   currently always NULL: nothing in this
-                                   contract or the pipeline populates it
-                                   (ApplicabilityRule.confidence_extraction
-                                   covers that job now, on its own table).
-                                   Left alone here -- out of scope for this
-                                   change, flagged for a separate decision
+
+RegulatoryRequirement.confidence_applicability and
+Obligation.confidence_applicability existed since Phase 0 but were never
+populated by any extraction code -- confirmed 0/387 and 0/337 rows
+non-null before removing them (2026-10-06). ApplicabilityRule's own
+confidence_extraction, on its own table, does that job now: one score per
+scoping rule, not one aggregate column on the parent.
 
 No defaults on confidence or high-risk fields: if Claude's response is
 missing one, Pydantic validation fails loudly rather than the field

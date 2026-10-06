@@ -49,7 +49,6 @@ class Obligation(UUIDPKMixin, TimestampMixin, Base):
     confidence_extraction: Mapped[Optional[float]] = mapped_column(Float, default=None)
     confidence_source_match: Mapped[Optional[float]] = mapped_column(Float, default=None)
     confidence_classification: Mapped[Optional[float]] = mapped_column(Float, default=None)
-    confidence_applicability: Mapped[Optional[float]] = mapped_column(Float, default=None)
     confidence_interpretation: Mapped[Optional[float]] = mapped_column(Float, default=None)
 
     extraction_run_id: Mapped[uuid.UUID] = mapped_column(
