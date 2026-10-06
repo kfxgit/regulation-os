@@ -22,6 +22,32 @@ _ENTITY_ALIASES = {
     "mfb": "microfinance bank",
     "member fi": "fi",
     "lead/agent fi": "fi",
+    "ecib member fi": "fi",
+    "branche": "branch",  # _normalize("branches") -> "branche", not "branch"
+    "bank branche": "branch",
+    "commercial bank branche": "branch",
+    "sorting bank": "bank",
+    "addressee bank": "bank",
+    "commercial bank": "bank",
+    "conventional bank": "bank",
+    "parent bank": "bank",
+    "sending/receiving bank": "bank",
+    "participant": "raast participant",
+    "participant bank": "raast participant",
+    "raast participant bank": "raast participant",
+    "participating institution": "raast participant",
+    "digital bank": "digital bank",
+    "auditor": "external auditor",
+    "islamic banking subsidiary": "islamic banking subsidiary",
+    "chest": "currency chest",
+    "sub-chest": "sub-chest",
+}
+
+_PRODUCT_ALIASES = {
+    "raast service": "raast",
+    "raast related service": "raast",
+    "raast p2p service": "raast",
+    "raast over-the-counter (otc) facility": "raast",
 }
 
 
@@ -59,7 +85,13 @@ def resolve_entity_type(session, text: str):
 def resolve_product_type(session, text: str):
     from app.models import ProductType
 
-    return _resolve(session, ProductType, text)
+    resolved = _resolve(session, ProductType, text)
+    if resolved is not None:
+        return resolved
+    alias_target = _PRODUCT_ALIASES.get(_normalize(text))
+    if alias_target is not None:
+        return _resolve(session, ProductType, alias_target)
+    return None
 
 
 def resolve_business_activity(session, text: str):

@@ -293,6 +293,40 @@ def reject_relationship(session, relationship: RegulatoryRelationship, reviewer:
     )
 
 
+def correct_relationship(
+    session,
+    relationship: RegulatoryRelationship,
+    relationship_type: RelationshipType,
+    reviewer: str,
+    notes: str | None = None,
+):
+    """Correct a DRAFT relationship's type (e.g. extracted as REFERENCES
+    when it should be AMENDS) and activate it. Unlike RegulatoryRequirement,
+    RegulatoryRelationship has no stable_key/revision_number -- it isn't
+    immutable -- so a correction edits the row in place rather than
+    appending a new revision, then records the before/after as a single
+    CORRECTED review."""
+    if relationship.status != RequirementStatus.DRAFT:
+        return
+
+    before = _relationship_snapshot(relationship)
+    relationship.relationship_type = relationship_type
+    relationship.status = RequirementStatus.ACTIVE
+    session.flush()
+    after = _relationship_snapshot(relationship)
+    session.add(
+        Review(
+            relationship_id=relationship.id,
+            reviewer_identifier=reviewer,
+            decision=ReviewDecision.CORRECTED,
+            before_snapshot=before,
+            after_snapshot=after,
+            notes=notes,
+            reviewed_at=datetime.now(timezone.utc),
+        )
+    )
+
+
 def approve_applicability(
     session,
     rule: ApplicabilityRule,

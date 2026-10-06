@@ -1,0 +1,247 @@
+<title>Relationships & Applicability Review</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #F6F4EE;
+    --surface: #FFFFFF;
+    --surface-2: #FBFAF6;
+    --ink: #1B2420;
+    --muted: #6B7570;
+    --border: #DCD8CC;
+    --accent: #1F5C4E;
+    --accent-ink: #F6F4EE;
+    --amber: #A6740A;
+    --amber-bg: color-mix(in srgb, var(--amber) 14%, var(--surface));
+    --focus: #1F5C4E;
+
+    --type-rule: #1F5C4E;
+    --type-amendment: #3B5488;
+    --type-definition: #8A7B6B;
+    --type-exception: #9C4A3E;
+    --type-procedure: #6B4E85;
+    --type-table: #5B6B75;
+
+    --font-display: "IBM Plex Serif", Georgia, serif;
+    --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10161A; --surface: #182024; --surface-2: #141B1F;
+      --ink: #E7EEE9; --muted: #8FA095; --border: #2A353A;
+      --accent: #4FBFA0; --accent-ink: #0B1412; --amber: #D9A441;
+      --focus: #4FBFA0;
+      --type-rule: #4FBFA0; --type-amendment: #7C93C7; --type-definition: #B3A491;
+      --type-exception: #D08277; --type-procedure: #A98BC4; --type-table: #93A6B0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10161A; --surface: #182024; --surface-2: #141B1F;
+    --ink: #E7EEE9; --muted: #8FA095; --border: #2A353A;
+    --accent: #4FBFA0; --accent-ink: #0B1412; --amber: #D9A441;
+    --focus: #4FBFA0;
+    --type-rule: #4FBFA0; --type-amendment: #7C93C7; --type-definition: #B3A491;
+    --type-exception: #D08277; --type-procedure: #A98BC4; --type-table: #93A6B0;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 80px; }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; }
+  .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  header.page-head { margin-bottom: 22px; }
+  header.page-head h1 { font-size: 26px; margin-top: 4px; }
+  header.page-head p.lede { color: var(--muted); max-width: 68ch; margin: 8px 0 0; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin: 20px 0; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .stat .n { font-family: var(--font-mono); font-size: 22px; font-variant-numeric: tabular-nums; font-weight: 500; }
+  .stat .l { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .filterbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px; margin-bottom: 18px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .filterbar input[type="search"] { flex: 1 1 200px; min-width: 0; padding: 8px 12px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); font-family: var(--font-body); font-size: 14px; }
+  .filterbar input[type="search"]:focus, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .chip { font-family: var(--font-mono); font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+  .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .textbtn { font-family: var(--font-mono); font-size: 12px; color: var(--muted); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 6px 4px; }
+  .progress { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-left: auto; white-space: nowrap; }
+
+  .doc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+  .doc-head { padding: 14px 18px; background: var(--surface-2); border-bottom: 1px solid var(--border); cursor: pointer; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .doc-head h2 { font-size: 16px; flex: 1 1 auto; }
+  .doc-meta { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .doc-count { font-family: var(--font-mono); font-size: 12px; color: var(--accent); white-space: nowrap; }
+  .doc-body { padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .doc.collapsed .doc-body { display: none; }
+  .doc-head .chev { transition: transform 0.15s ease; color: var(--muted); }
+  .doc.collapsed .chev { transform: rotate(-90deg); }
+
+  .req { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .req-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .badge { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.03em; text-transform: uppercase; padding: 3px 8px; border-radius: 5px; font-weight: 500; }
+  .req-text { font-size: 14px; }
+
+  .items { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .item { background: var(--surface-2); border-radius: 6px; padding: 8px 10px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+  .item .kind { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 4px; }
+  .item.relationship .kind { background: color-mix(in srgb, var(--type-amendment) 18%, var(--surface)); color: var(--type-amendment); }
+  .item.applicability .kind { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--accent); }
+  .item .unresolved { font-family: var(--font-mono); font-size: 10.5px; color: var(--amber); background: var(--amber-bg); padding: 1px 6px; border-radius: 4px; }
+  .item .conf { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  .item .cond { color: var(--muted); font-style: italic; width: 100%; }
+  .item-id { font-family: var(--font-mono); font-size: 10px; color: var(--muted); user-select: all; }
+
+  .empty-state { color: var(--muted); text-align: center; padding: 40px 0; font-family: var(--font-mono); font-size: 13px; }
+
+  @media (max-width: 480px) {
+    .progress { margin-left: 0; width: 100%; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="page-head">
+    <div class="eyebrow">Regulation OS &middot; Phase 2 review</div>
+    <h1>Relationships &amp; Applicability &mdash; review in progress</h1>
+    <p class="lede">Every relationship (AMENDS/SUPERSEDES/etc.) and applicability rule (who/what a clause applies to) is AI-extracted and DRAFT until reviewed. Amber "unresolved" means the entity/product/document named in the text doesn't match our taxonomy yet -- the raw text is kept, nothing is guessed.</p>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="filterbar">
+    <input type="search" id="search" placeholder="Search clause text, targets, conditions&hellip;" aria-label="Search">
+    <button class="chip" id="unresolvedChip" aria-pressed="false">Unresolved only</button>
+    <button class="chip" id="relOnlyChip" aria-pressed="false">Relationships only</button>
+    <button class="chip" id="appOnlyChip" aria-pressed="false">Applicability only</button>
+    <button class="textbtn" id="toggleAll">Collapse all</button>
+    <span class="progress" id="progress"></span>
+  </div>
+
+  <div id="docs"></div>
+  <div class="empty-state" id="emptyState" hidden>No items match this filter.</div>
+</div>
+
+<script>
+  const REVIEW_DATA = /*__REVIEW2_DATA_JSON__*/ null;
+
+  const CLAUSE_LABELS = { RULE: "Rule", AMENDMENT_TEXT: "Amendment", DEFINITION: "Definition", EXCEPTION: "Exception", PROCEDURE: "Procedure", TABLE_DATA: "Table data" };
+  const CLAUSE_CLASS = { RULE: "rule", AMENDMENT_TEXT: "amendment", DEFINITION: "definition", EXCEPTION: "exception", PROCEDURE: "procedure", TABLE_DATA: "table" };
+
+  function escapeHtml(s) {
+    return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function fmtConf(v) { return v === null || v === undefined ? "&ndash;" : v.toFixed(2); }
+
+  function renderStats(docs) {
+    const reqs = docs.flatMap(d => d.requirements);
+    const rels = reqs.flatMap(r => r.relationships);
+    const apps = reqs.flatMap(r => r.applicability_rules);
+    const unresolvedRels = rels.filter(r => !r.resolved).length;
+    const unresolvedAppDims = apps.reduce((a, r) => a + [r.entity, r.product, r.activity].filter((v, i) => v && ![r.entity_resolved, r.product_resolved, r.activity_resolved][i]).length, 0);
+    const tiles = [
+      [docs.length, "documents"], [reqs.length, "clauses"],
+      [rels.length, "relationships"], [apps.length, "applicability rules"],
+      [unresolvedRels + unresolvedAppDims, "unresolved items"],
+    ];
+    document.getElementById("stats").innerHTML = tiles.map(([n, l]) => `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("");
+  }
+
+  function renderRelationship(r) {
+    return `<div class="item relationship" data-id="${r.id}">
+      <span class="kind">${r.relationship_type}</span>
+      <span>&rarr; ${escapeHtml(r.target)}</span>
+      ${r.resolved ? "" : `<span class="unresolved">unresolved</span>`}
+      <span class="conf">conf ${fmtConf(r.confidence)}</span>
+      <span class="item-id">${r.id}</span>
+    </div>`;
+  }
+
+  function renderApplicability(a) {
+    const dims = [];
+    if (a.entity) dims.push(`<span>entity: ${escapeHtml(a.entity)}</span>${a.entity_resolved ? "" : `<span class="unresolved">unresolved</span>`}`);
+    if (a.product) dims.push(`<span>product: ${escapeHtml(a.product)}</span>${a.product_resolved ? "" : `<span class="unresolved">unresolved</span>`}`);
+    if (a.activity) dims.push(`<span>activity: ${escapeHtml(a.activity)}</span>${a.activity_resolved ? "" : `<span class="unresolved">unresolved</span>`}`);
+    return `<div class="item applicability" data-id="${a.id}">
+      <span class="kind">${a.scope_type}</span>
+      ${dims.join(" ")}
+      <span class="conf">conf ${fmtConf(a.confidence)}</span>
+      <span class="item-id">${a.id}</span>
+      ${a.condition_text ? `<span class="cond">if: ${escapeHtml(a.condition_text)}</span>` : ""}
+    </div>`;
+  }
+
+  function matchesFilter(req, query, unresolvedOnly, relOnly, appOnly) {
+    let rels = req.relationships, apps = req.applicability_rules;
+    if (relOnly) apps = [];
+    if (appOnly) rels = [];
+    if (unresolvedOnly) {
+      rels = rels.filter(r => !r.resolved);
+      apps = apps.filter(a => (a.entity && !a.entity_resolved) || (a.product && !a.product_resolved) || (a.activity && !a.activity_resolved));
+    }
+    if (query) {
+      const hay = [req.requirement_text, ...rels.map(r => r.target), ...apps.flatMap(a => [a.entity, a.product, a.activity, a.condition_text])].join(" \n ").toLowerCase();
+      if (!hay.includes(query)) { rels = []; apps = []; }
+    }
+    return { rels, apps, visible: rels.length > 0 || apps.length > 0 };
+  }
+
+  function renderDocs(docs, query, unresolvedOnly, relOnly, appOnly) {
+    const container = document.getElementById("docs");
+    let visibleTotal = 0;
+    container.innerHTML = docs.map((doc, di) => {
+      const reqBlocks = doc.requirements.map(req => {
+        const { rels, apps, visible } = matchesFilter(req, query, unresolvedOnly, relOnly, appOnly);
+        if (!visible) return "";
+        visibleTotal++;
+        return `<div class="req">
+          <div class="req-top">
+            <span class="badge" style="background: color-mix(in srgb, var(--type-${CLAUSE_CLASS[req.clause_type] || 'rule'}) 16%, var(--surface)); color: var(--type-${CLAUSE_CLASS[req.clause_type] || 'rule'});">${CLAUSE_LABELS[req.clause_type] || req.clause_type}</span>
+          </div>
+          <div class="req-text">${escapeHtml(req.requirement_text)}</div>
+          <div class="items">${rels.map(renderRelationship).join("")}${apps.map(renderApplicability).join("")}</div>
+        </div>`;
+      }).join("");
+      if (!reqBlocks.trim()) return "";
+      return `<section class="doc" data-doc-index="${di}">
+        <div class="doc-head" data-toggle-doc="${di}">
+          <span class="chev" aria-hidden="true">&#9662;</span>
+          <h2>${escapeHtml(doc.title)}</h2>
+          <span class="doc-meta">${escapeHtml(doc.reference_number)}</span>
+        </div>
+        <div class="doc-body">${reqBlocks}</div>
+      </section>`;
+    }).join("");
+    document.getElementById("emptyState").hidden = visibleTotal > 0;
+    document.getElementById("progress").textContent = `${visibleTotal} clause(s) shown`;
+  }
+
+  function init() {
+    const docs = REVIEW_DATA.documents;
+    renderStats(docs);
+
+    let query = "", unresolvedOnly = false, relOnly = false, appOnly = false;
+
+    function rerender() {
+      renderDocs(docs, query, unresolvedOnly, relOnly, appOnly);
+      document.querySelectorAll("[data-toggle-doc]").forEach(el => {
+        el.addEventListener("click", () => el.closest(".doc").classList.toggle("collapsed"));
+      });
+    }
+
+    document.getElementById("search").addEventListener("input", (e) => { query = e.target.value.trim().toLowerCase(); rerender(); });
+    document.getElementById("unresolvedChip").addEventListener("click", (e) => { unresolvedOnly = !unresolvedOnly; e.target.setAttribute("aria-pressed", unresolvedOnly); rerender(); });
+    document.getElementById("relOnlyChip").addEventListener("click", (e) => { relOnly = !relOnly; if (relOnly) { appOnly = false; document.getElementById("appOnlyChip").setAttribute("aria-pressed", "false"); } e.target.setAttribute("aria-pressed", relOnly); rerender(); });
+    document.getElementById("appOnlyChip").addEventListener("click", (e) => { appOnly = !appOnly; if (appOnly) { relOnly = false; document.getElementById("relOnlyChip").setAttribute("aria-pressed", "false"); } e.target.setAttribute("aria-pressed", appOnly); rerender(); });
+
+    let allCollapsed = false;
+    document.getElementById("toggleAll").addEventListener("click", (e) => {
+      allCollapsed = !allCollapsed;
+      document.querySelectorAll(".doc").forEach(d => d.classList.toggle("collapsed", allCollapsed));
+      e.target.textContent = allCollapsed ? "Expand all" : "Collapse all";
+    });
+
+    rerender();
+  }
+
+  init();
+</script>

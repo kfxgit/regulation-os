@@ -34,6 +34,13 @@ ENTITY_TYPES = [
     {"code": "NBFC", "name": "Non-Bank Finance Company"},
     {"code": "MODARABA", "name": "Modaraba"},
     {"code": "FI", "name": "Financial Institution"},
+    {"code": "BRANCH", "name": "Branch"},  # 11 mentions ("branches"/"bank branches"/etc.)
+    {"code": "RAAST_PARTICIPANT", "name": "Raast Participant"},  # 10 mentions ("Participants"/etc.)
+    {"code": "DIGITAL_BANK", "name": "Digital Bank"},  # 2 mentions
+    {"code": "EXTERNAL_AUDITOR", "name": "External Auditor"},  # 2 mentions
+    {"code": "ISLAMIC_BANKING_SUBSIDIARY", "name": "Islamic Banking Subsidiary"},  # 4 mentions
+    {"code": "CURRENCY_CHEST", "name": "Currency Chest"},  # 1 mention, SBP cash mgmt term
+    {"code": "SUB_CHEST", "name": "Sub-Chest"},  # 1 mention, SBP cash mgmt term
 ]
 
 PRODUCT_TYPES = [
@@ -43,6 +50,12 @@ PRODUCT_TYPES = [
     {"code": "BNPL", "name": "Buy Now Pay Later"},
     {"code": "DIGITAL_LENDING", "name": "Digital Lending"},
     {"code": "REMITTANCE", "name": "Remittance"},
+    {"code": "RAAST", "name": "Raast"},  # 4 mentions plus "Raast services"/etc. variants
+    {"code": "MTS", "name": "MTS"},  # named as extracted -- source text never expands the acronym
+    {"code": "TTS", "name": "TTS"},
+    {"code": "DDS", "name": "DDS"},
+    {"code": "CLAIM_NOTES", "name": "Claim Notes"},
+    {"code": "DEFECTIVE_NOTES", "name": "Clearly Payable Defective Notes"},
 ]
 
 BUSINESS_ACTIVITIES = [

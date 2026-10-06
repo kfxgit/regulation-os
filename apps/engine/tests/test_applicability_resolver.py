@@ -27,11 +27,19 @@ def test_resolve_entity_type_matches_multi_word_name(db_session):
 
 
 def test_resolve_entity_type_refuses_to_guess_on_partial_phrase(db_session):
-    """'Islamic Banking Subsidiaries' is a different concept from
-    'Islamic Bank' (a subsidiary structure, not the bank type itself) --
-    must not silently match just because the words overlap."""
-    resolved = resolve_entity_type(db_session, "Islamic Banking Subsidiaries")
+    """'Takaful Operator' is a different concept from 'Islamic Bank' (a
+    separate, non-bank insurer category) -- must not silently match just
+    because 'Islamic'/banking-adjacent words overlap with something seeded."""
+    resolved = resolve_entity_type(db_session, "Takaful Operator")
     assert resolved is None
+
+
+def test_resolve_entity_type_matches_islamic_banking_subsidiary(db_session):
+    """Added to the taxonomy after real evidence (4 mentions across FCY
+    subordinated debt clauses) -- a real seeded entity, not a guess."""
+    resolved = resolve_entity_type(db_session, "Islamic banking subsidiary")
+    assert resolved is not None
+    assert resolved.code == "ISLAMIC_BANKING_SUBSIDIARY"
 
 
 def test_resolve_entity_type_matches_via_known_alias(db_session):

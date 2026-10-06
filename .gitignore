@@ -30,3 +30,5 @@ apps/engine/data/incoming/*
 apps/engine/data/batch_review_*.json
 apps/engine/data/review_template.html
 apps/engine/data/review_page.html
+apps/engine/data/review2_data.json
+apps/engine/data/review2_page.html
